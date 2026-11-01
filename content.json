@@ -1,0 +1,62 @@
+{
+  "wechatId": "yanzhaolab",
+  "qrImage": "assets/wechat-qr.svg",
+  "basePrice": 700,
+  "trimPrices": {
+    "none": 0,
+    "single": 30,
+    "double": 50,
+    "corner": 40
+  },
+  "cases": [
+    {
+      "styleId": "cloud",
+      "name": "云朵弧",
+      "image": "assets/styles/cloud.png",
+      "model": "assets/styles/cloud.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "tall",
+      "name": "高弧",
+      "image": "assets/styles/tall.png",
+      "model": "assets/styles/tall.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "line",
+      "name": "直边梯形",
+      "image": "assets/styles/line.png",
+      "model": "assets/styles/line.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "arch",
+      "name": "微拱门",
+      "image": "assets/styles/arch.png",
+      "model": "assets/styles/arch.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "retro",
+      "name": "海棠边",
+      "image": "assets/styles/retro.png",
+      "model": "assets/styles/retro.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "float",
+      "name": "悬浮边",
+      "image": "assets/styles/float.png",
+      "model": "assets/styles/float.png",
+      "fit": "contain"
+    },
+    {
+      "styleId": "crown",
+      "name": "方冠",
+      "image": "assets/styles/crown.png",
+      "model": "assets/styles/crown.png",
+      "fit": "contain"
+    }
+  ]
+}

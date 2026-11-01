@@ -1,0 +1,1340 @@
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const PANEL_THICKNESS = 5;
+const TRANSITION_THICKNESS = 3;
+const INSTALL_CLEARANCE = 5;
+const TRIM_WIDTH = 16;
+const STYLE_PALETTE = {
+  cloud: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  line: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  arch: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  retro: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  float: { shell: 0xe6d2b7, trim: 0xd8be9e },
+};
+const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
+
+export function createPreview(container, initialState, options = {}) {
+  const fitMargin = options.fitMargin ?? 1.32;
+  const softLighting = Boolean(options.softLighting);
+  const aspectFit = Boolean(options.aspectFit);
+  let state = { ...initialState };
+  let scene;
+  let camera;
+  let renderer;
+  let controls;
+  let model;
+  let observer;
+  let fitDistance = 2200;
+  let disposed = false;
+  let savedView = null;
+  let focusName = "";
+  let focusTimer = 0;
+  let viewTween = 0;
+  let flashTimer = 0;
+  let restoreFadeTimer = 0;
+  let measureLine = null;
+  const flashItems = [];
+  const dimMaterials = new Map();
+
+  const initialDirection = options.direction
+    ? new THREE.Vector3(...options.direction).normalize()
+    : v3(0.55, 0.2, 1.5).normalize();
+  const targetOffset = options.targetOffset
+    ? new THREE.Vector3(...options.targetOffset)
+    : new THREE.Vector3();
+  const shellMat = new THREE.MeshStandardMaterial({ color: 0xe6d2b7, roughness: 0.68, metalness: 0.02, side: THREE.DoubleSide });
+  const transitionMat = new THREE.MeshStandardMaterial({ color: 0xe6d2b7, roughness: 0.64, metalness: 0.02, side: THREE.DoubleSide });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0xd8be9e, roughness: 0.46, metalness: 0.02, side: THREE.DoubleSide });
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x92998f, transparent: true, opacity: 0.58 });
+
+  function addPlanarFace(points, project, material, name, outline = true, thickness = 0, extrusionSign = 1) {
+    const contour = points.map(([u, v]) => new THREE.Vector2(u, v));
+    let geometry;
+    if (thickness > 0) {
+      const shape = new THREE.Shape(contour);
+      geometry = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+      const origin = project(0, 0);
+      const axisU = project(1, 0).sub(origin);
+      const axisV = project(0, 1).sub(origin);
+      const normal = axisU.clone().cross(axisV).normalize().multiplyScalar(extrusionSign);
+      const position = geometry.getAttribute("position");
+      const point = new THREE.Vector3();
+      for (let index = 0; index < position.count; index++) {
+        point.copy(origin)
+          .addScaledVector(axisU, position.getX(index))
+          .addScaledVector(axisV, position.getY(index))
+          .addScaledVector(normal, position.getZ(index));
+        position.setXYZ(index, point.x, point.y, point.z);
+      }
+      position.needsUpdate = true;
+      geometry.computeVertexNormals();
+    } else {
+      const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
+      const positions = [];
+      for (const triangle of triangles) {
+        for (const index of triangle) {
+          const point = project(contour[index].x, contour[index].y);
+          positions.push(point.x, point.y, point.z);
+        }
+      }
+      geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.computeVertexNormals();
+    }
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    model.add(mesh);
+    if (outline) {
+      const edgePoints = points.map(([u, v]) => project(u, v));
+      edgePoints.push(edgePoints[0]);
+      const edge = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints), edgeMat);
+      edge.name = `${name}·边线`;
+      model.add(edge);
+    }
+    return mesh;
+  }
+
+  function transitionProfile(t, strength) {
+    if (state.surfaceType === "flat" || strength <= 0) return { spread: t, drop: t };
+    const inverse = 1 - t;
+    const concave = state.surfaceType === "concave";
+    const control1 = concave ? [0, 0.42] : [0.42, 0];
+    const control2 = concave ? [0.72, 1] : [1, 0.72];
+    const easedSpread =
+      3 * inverse * inverse * t * control1[0] +
+      3 * inverse * t * t * control2[0] +
+      t ** 3;
+    const easedDrop =
+      3 * inverse * inverse * t * control1[1] +
+      3 * inverse * t * t * control2[1] +
+      t ** 3;
+    const blend = strength / 100;
+    return {
+      spread: THREE.MathUtils.lerp(t, easedSpread, blend),
+      drop: THREE.MathUtils.lerp(t, easedDrop, blend),
+    };
+  }
+
+  // 豁口形状：rect 矩形 / rounded 圆角矩形 / arch 圆弧 / trapezoid 梯形
+  function notchProfile(baseY, left, right, height, shape = "arch") {
+    const top = baseY + height;
+    if (shape === "rect") {
+      return [[right, baseY], [right, top], [left, top], [left, baseY]];
+    }
+    if (shape === "trapezoid") {
+      const inset = Math.min((right - left) * 0.2, height * 0.6);
+      return [[right, baseY], [right - inset, top], [left + inset, top], [left, baseY]];
+    }
+    if (shape === "rounded") {
+      const radius = Math.min(height * 0.45, (right - left) * 0.18);
+      const points = [[right, baseY]];
+      for (let index = 0; index <= 10; index++) {
+        const angle = (Math.PI / 2) * (index / 10);
+        points.push([right - radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
+      }
+      for (let index = 1; index <= 10; index++) {
+        const angle = Math.PI / 2 + (Math.PI / 2) * (index / 10);
+        points.push([left + radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
+      }
+      points.push([left, baseY]);
+      return points;
+    }
+    const cx = (left + right) / 2;
+    const half = (right - left) / 2;
+    const rise = Math.max(1, height);
+    const radius = (half * half + rise * rise) / (2 * rise);
+    const cy = baseY + rise - radius;
+    const startAngle = Math.atan2(baseY - cy, right - cx);
+    const endAngle = Math.atan2(baseY - cy, left - cx);
+    const points = [];
+    for (let index = 0; index <= 36; index++) {
+      const angle = startAngle + (endAngle - startAngle) * (index / 36);
+      points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+    }
+    return points;
+  }
+
+  function addTransitionSurface(name, pointAt, material, strength, lockWallEdge = false) {
+    const rows = 72;
+    const columns = 48;
+    const positions = [];
+    const indices = [];
+    for (let row = 0; row <= rows; row++) {
+      const t = row / rows;
+      const profile = transitionProfile(t, strength);
+      const wallPlaneZ = lockWallEdge ? pointAt(0, profile).z : -Infinity;
+      for (let column = 0; column <= columns; column++) {
+        const u = column / columns;
+        const point = pointAt(u, profile);
+        if (lockWallEdge) point.z = Math.max(wallPlaneZ, point.z);
+        positions.push(point.x, point.y, point.z);
+      }
+    }
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        const a = row * (columns + 1) + column;
+        const b = a + columns + 1;
+        indices.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+    const centerGeometry = new THREE.BufferGeometry();
+    centerGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    centerGeometry.setIndex(indices);
+    centerGeometry.computeVertexNormals();
+    const centerNormals = centerGeometry.getAttribute("normal");
+    const halfThickness = TRANSITION_THICKNESS / 2;
+    const boundary = [];
+    for (let column = 0; column <= columns; column++) boundary.push(column);
+    for (let row = 1; row <= rows; row++) boundary.push(row * (columns + 1) + columns);
+    for (let column = columns - 1; column >= 0; column--) boundary.push(rows * (columns + 1) + column);
+    for (let row = rows - 1; row > 0; row--) boundary.push(row * (columns + 1));
+
+    const makeOffsetGeometry = (offset, reverse = false) => {
+      const offsetPositions = new Float32Array(positions.length);
+      for (let index = 0; index < positions.length / 3; index++) {
+        offsetPositions[index * 3] = positions[index * 3] + centerNormals.getX(index) * offset;
+        offsetPositions[index * 3 + 1] = positions[index * 3 + 1] + centerNormals.getY(index) * offset;
+        offsetPositions[index * 3 + 2] = positions[index * 3 + 2] + centerNormals.getZ(index) * offset;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(offsetPositions, 3));
+      if (reverse) {
+        const reversedIndices = [];
+        for (let index = 0; index < indices.length; index += 3) {
+          reversedIndices.push(indices[index], indices[index + 2], indices[index + 1]);
+        }
+        geometry.setIndex(reversedIndices);
+      } else {
+        geometry.setIndex(indices);
+      }
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
+    const front = new THREE.Mesh(makeOffsetGeometry(halfThickness), material);
+    front.name = `${name}·外表面`;
+    const inner = new THREE.Mesh(makeOffsetGeometry(-halfThickness, true), material);
+    inner.name = `${name}·内表面`;
+    const edgePositions = [];
+    for (let index = 0; index < boundary.length; index++) {
+      const a = boundary[index];
+      const b = boundary[(index + 1) % boundary.length];
+      edgePositions.push(
+        positions[a * 3] + centerNormals.getX(a) * halfThickness,
+        positions[a * 3 + 1] + centerNormals.getY(a) * halfThickness,
+        positions[a * 3 + 2] + centerNormals.getZ(a) * halfThickness,
+        positions[b * 3] + centerNormals.getX(b) * halfThickness,
+        positions[b * 3 + 1] + centerNormals.getY(b) * halfThickness,
+        positions[b * 3 + 2] + centerNormals.getZ(b) * halfThickness,
+        positions[b * 3] - centerNormals.getX(b) * halfThickness,
+        positions[b * 3 + 1] - centerNormals.getY(b) * halfThickness,
+        positions[b * 3 + 2] - centerNormals.getZ(b) * halfThickness,
+        positions[a * 3] - centerNormals.getX(a) * halfThickness,
+        positions[a * 3 + 1] - centerNormals.getY(a) * halfThickness,
+        positions[a * 3 + 2] - centerNormals.getZ(a) * halfThickness
+      );
+    }
+    const edges = new THREE.BufferGeometry();
+    edges.setAttribute("position", new THREE.Float32BufferAttribute(edgePositions, 3));
+    const edgeIndices = [];
+    for (let index = 0; index < boundary.length; index++) {
+      const base = index * 4;
+      edgeIndices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    edges.setIndex(edgeIndices);
+    edges.computeVertexNormals();
+    const edgeMesh = new THREE.Mesh(edges, material);
+    edgeMesh.name = `${name}·切边`;
+    for (const mesh of [front, inner, edgeMesh]) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      model.add(mesh);
+    }
+    centerGeometry.dispose();
+  }
+
+  function trimProfile(style) {
+    const width = TRIM_WIDTH;
+    if (style === "double") {
+      const gap = width * 0.18;
+      const bead = (width - gap) / 2;
+      const steps = 12;
+      const profile = [];
+      for (let index = 0; index <= steps; index++) {
+        const angle = Math.PI * index / steps;
+        profile.push([bead / 2 - bead / 2 * Math.cos(angle), bead / 2 * Math.sin(angle)]);
+      }
+      profile.push([bead + gap, 0]);
+      for (let index = 1; index <= steps; index++) {
+        const angle = Math.PI * index / steps;
+        profile.push([bead + gap + bead / 2 - bead / 2 * Math.cos(angle), bead / 2 * Math.sin(angle)]);
+      }
+      return profile;
+    }
+    if (style === "corner") {
+      // 顶角条：倒三角截面——平顶贴天花板、平背贴墙，斜边做成内凹圆弧线脚
+      const w = width * 3.0;
+      const points = [[0, 0], [0, w * 0.5], [w * 0.06, w * 0.5], [w * 0.06, w * 0.54]];
+      const from = [w * 0.06, w * 0.54];
+      const control = [w * 0.30, w * 0.14];
+      const to = [w * 0.86, w * 0.10];
+      for (let index = 1; index <= 22; index++) {
+        const t = index / 22;
+        const mt = 1 - t;
+        points.push([
+          mt * mt * from[0] + 2 * mt * t * control[0] + t * t * to[0],
+          mt * mt * from[1] + 2 * mt * t * control[1] + t * t * to[1],
+        ]);
+      }
+      points.push([w * 0.90, w * 0.16], [w * 0.96, w * 0.16], [w, w * 0.08], [w, 0]);
+      return points;
+    }
+    const steps = 20;
+    const profile = [];
+    for (let index = 0; index <= steps; index++) {
+      const angle = Math.PI * index / steps;
+      profile.push([width / 2 - width / 2 * Math.cos(angle), width / 2 * Math.sin(angle)]);
+    }
+    return profile;
+  }
+
+  function addProfileTrim(points, winding, profile, material, name, endPlanes = {}) {
+    const source = points.filter((point, index) =>
+      index === 0 || point.distanceToSquared(points[index - 1]) > 1e-8
+    );
+    if (source.length < 2) return;
+
+    const segments = [];
+    for (let index = 0; index < source.length - 1; index++) {
+      const start = source[index];
+      const end = source[index + 1];
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+      if (length < 1e-6) continue;
+      direction.divideScalar(length);
+      const middle = start.clone().add(end).multiplyScalar(0.5);
+      let axisU, axisV, normal;
+      if (Math.abs(direction.z) < 1e-5) {
+        axisU = v3(1, 0, 0); axisV = v3(0, 1, 0); normal = v3(0, 0, 1);
+      } else if (middle.x < 0) {
+        axisU = v3(0, 0, 1); axisV = v3(0, 1, 0); normal = v3(-1, 0, 0);
+      } else {
+        axisU = v3(0, 0, -1); axisV = v3(0, 1, 0); normal = v3(1, 0, 0);
+      }
+      const axisUDot = direction.dot(axisU);
+      const axisVDot = direction.dot(axisV);
+      const inward = winding > 0
+        ? axisU.clone().multiplyScalar(-axisVDot).addScaledVector(axisV, axisUDot)
+        : axisU.clone().multiplyScalar(axisVDot).addScaledVector(axisV, -axisUDot);
+      inward.normalize();
+      segments.push({
+        start, direction, length, inward, normal,
+        startMiter: direction.clone(),
+        endMiter: direction.clone(),
+      });
+    }
+    if (!segments.length) return;
+
+    for (let index = 0; index < segments.length - 1; index++) {
+      const current = segments[index];
+      const following = segments[index + 1];
+      const miter = current.normal.dot(following.normal) > 0.999
+        ? current.direction.clone().add(following.direction).normalize()
+        : current.normal.clone().sub(following.normal).normalize();
+      if (miter.dot(current.direction) < 0) miter.multiplyScalar(-1);
+      current.endMiter.copy(miter);
+      following.startMiter.copy(miter);
+    }
+    if (endPlanes.startNormal) segments[0].startMiter.copy(endPlanes.startNormal).normalize();
+    if (endPlanes.endNormal) segments[segments.length - 1].endMiter.copy(endPlanes.endNormal).normalize();
+
+    const positions = [];
+    const indices = [];
+    const profileCount = profile.length;
+    for (const segment of segments) {
+      const base = positions.length / 3;
+      const startDot = Math.max(0.2, segment.direction.dot(segment.startMiter));
+      const endDot = Math.max(0.2, segment.direction.dot(segment.endMiter));
+      const startInward = segment.inward.dot(segment.startMiter);
+      const startNormal = segment.normal.dot(segment.startMiter);
+      const endInward = segment.inward.dot(segment.endMiter);
+      const endNormal = segment.normal.dot(segment.endMiter);
+      for (let row = 0; row < 2; row++) {
+        for (const [offset, height] of profile) {
+          const shift = row === 0
+            ? -(offset * startInward + height * startNormal) / startDot
+            : -(offset * endInward + height * endNormal) / endDot;
+          const distance = row === 0 ? shift : segment.length + shift;
+          const point = segment.start.clone()
+            .addScaledVector(segment.direction, distance)
+            .addScaledVector(segment.inward, offset)
+            .addScaledVector(segment.normal, height);
+          positions.push(point.x, point.y, point.z);
+        }
+      }
+      for (let index = 0; index < profileCount - 1; index++) {
+        const a = base + index;
+        const b = a + 1;
+        const c = base + profileCount + index + 1;
+        const d = c - 1;
+        if (winding > 0) indices.push(a, c, b, a, d, c);
+        else indices.push(a, b, c, a, c, d);
+      }
+    }
+
+    const readPoint = (index) =>
+      new THREE.Vector3(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);
+    const contour = profile.map(([offset, height]) => new THREE.Vector2(offset, height));
+    const capTriangles = THREE.ShapeUtils.triangulateShape(contour, []);
+    const addCap = (ringBase, outward) => {
+      const capStart = indices.length;
+      for (const [a, b, c] of capTriangles) {
+        indices.push(ringBase + a, ringBase + b, ringBase + c);
+      }
+      const p0 = readPoint(indices[capStart]);
+      const p1 = readPoint(indices[capStart + 1]);
+      const p2 = readPoint(indices[capStart + 2]);
+      const capNormal = p1.clone().sub(p0).cross(p2.clone().sub(p0));
+      if (capNormal.dot(outward) < 0) {
+        for (let index = capStart; index < indices.length; index += 3) {
+          const swap = indices[index + 1];
+          indices[index + 1] = indices[index + 2];
+          indices[index + 2] = swap;
+        }
+      }
+    };
+    const endRingBase = positions.length / 3 - profileCount;
+    addCap(0, segments[0].direction.clone().multiplyScalar(-1));
+    addCap(endRingBase, segments[segments.length - 1].direction);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    model.add(mesh);
+  }
+
+  function buildModel() {
+    const palette = STYLE_PALETTE[state.styleId] || STYLE_PALETTE.cloud;
+    shellMat.color.setHex(palette.shell);
+    transitionMat.color.setHex(palette.shell);
+    trimMat.color.setHex(palette.trim);
+    const shim = clamp(state.shimHeight, 0, 60);
+    const width = state.hoodWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
+    const depth = state.hoodDepth + PANEL_THICKNESS;
+    const rearHeight = state.rearHeight + PANEL_THICKNESS + shim;
+    const frontHeight = state.frontHeight + PANEL_THICKNESS + shim;
+    const chimneyWidth = state.chimneyWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
+    const chimneyDepth = state.chimneyDepth + PANEL_THICKNESS;
+    const chimneyHeight = state.chimneyHeight - PANEL_THICKNESS;
+    const backZ = -depth;
+    const frontZ = 0;
+    const chimneyFrontZ = backZ + chimneyDepth;
+    const bottomFrontY = rearHeight - frontHeight;
+    const totalHeight = rearHeight + chimneyHeight;
+    const startFractions = state.surfaceType === "convex"
+      ? { middle: 0.55, lower: 0.4 }
+      : { middle: 0.5, top: 1 };
+    const startY = rearHeight + chimneyHeight * (startFractions[state.surfaceStart] ?? startFractions.middle);
+
+    // 操作豁口：沿用根目录 index.html 的参数与形状
+    const notchEnabled = state.notchEnabled ?? true;
+    const notchShape = state.notchShape ?? "arch";
+    const notchWidthMm = state.notchWidth ?? 420;
+    const notchHeightMm = state.notchHeight ?? 80;
+    const notchOffsetMm = state.notchOffset ?? 0;
+    let panelOutline = [
+      [-width / 2, bottomFrontY],
+      [-width / 2, rearHeight],
+      [width / 2, rearHeight],
+      [width / 2, bottomFrontY],
+    ];
+    let notchLeft = -width / 2;
+    let notchRight = width / 2;
+    let notchContour = [];
+    if (notchEnabled) {
+      const maxNotchWidth = Math.min(notchWidthMm, width - 60);
+      const center = clamp(
+        notchOffsetMm,
+        -(width - maxNotchWidth) / 2 + 25,
+        (width - maxNotchWidth) / 2 - 25
+      );
+      const half = maxNotchWidth / 2;
+      const openingHeight = Math.min(notchHeightMm, frontHeight - 24);
+      notchLeft = center - half;
+      notchRight = center + half;
+      notchContour = notchProfile(bottomFrontY, notchLeft, notchRight, openingHeight, notchShape);
+      panelOutline = [...panelOutline, ...notchContour];
+    }
+    addPlanarFace(
+      panelOutline,
+      (x, y) => v3(x, y, frontZ), shellMat, "下横前挡板·正面", true, PANEL_THICKNESS, -1
+    );
+
+    const sideFrontZ = frontZ - PANEL_THICKNESS;
+    const sideBackZ = backZ;
+    const sideTopY = rearHeight - PANEL_THICKNESS;
+    const sideBottomFrontY = bottomFrontY * (sideFrontZ - backZ) / depth;
+    const sideContour = [[sideBackZ, 0], [sideBackZ, sideTopY], [sideFrontZ, sideTopY], [sideFrontZ, sideBottomFrontY]];
+    addPlanarFace(sideContour, (z, y) => v3(-width / 2, y, z), shellMat, "下横左侧板·左侧面", true, PANEL_THICKNESS, -1);
+    addPlanarFace(sideContour, (z, y) => v3(width / 2, y, z), shellMat, "下横右侧板·右侧面", true, PANEL_THICKNESS, 1);
+
+    const chimneyOpeningWidth = state.chimneyWidth + 2 * INSTALL_CLEARANCE;
+    const chimneyOpeningDepth = state.chimneyDepth;
+    const hoodTopOutline = [
+      [-width / 2, backZ],
+      [-chimneyOpeningWidth / 2, backZ],
+      [-chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
+      [chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
+      [chimneyOpeningWidth / 2, backZ],
+      [width / 2, backZ],
+      [width / 2, frontZ],
+      [-width / 2, frontZ],
+    ];
+    addPlanarFace(hoodTopOutline, (x, z) => v3(x, rearHeight, z), shellMat, "下横顶板·顶面（贴墙侧敞口缺口）", false, PANEL_THICKNESS, 1);
+
+    if (shim > 0) {
+      const shimTop = rearHeight - PANEL_THICKNESS;
+      const shimBottom = shimTop - shim;
+      const shimContour = [
+        [backZ, shimBottom], [backZ, shimTop], [sideFrontZ, shimTop], [sideFrontZ, shimBottom],
+      ];
+      const panelInner = width / 2 - PANEL_THICKNESS;
+      addPlanarFace(shimContour, (z, y) => v3(-panelInner, y, z), shellMat, "内部垫高左垫板·外侧层", true, PANEL_THICKNESS, -1);
+      addPlanarFace(shimContour, (z, y) => v3(-panelInner + PANEL_THICKNESS * 2, y, z), shellMat, "内部垫高左垫板·内侧层", true, PANEL_THICKNESS, 1);
+      addPlanarFace(shimContour, (z, y) => v3(panelInner, y, z), shellMat, "内部垫高右垫板·外侧层", true, PANEL_THICKNESS, 1);
+      addPlanarFace(shimContour, (z, y) => v3(panelInner - PANEL_THICKNESS * 2, y, z), shellMat, "内部垫高右垫板·内侧层", true, PANEL_THICKNESS, -1);
+    }
+
+    const chimneyBack = backZ;
+    const chimneyLeft = -chimneyWidth / 2;
+    const chimneyRight = chimneyWidth / 2;
+    const chimneyTop = totalHeight;
+    const chimneySideBackZ = chimneyBack;
+    const chimneySideFrontZ = chimneyFrontZ - PANEL_THICKNESS;
+    if (chimneyTop - rearHeight > 0.1) {
+      addPlanarFace(
+        [[chimneyLeft, rearHeight], [chimneyRight, rearHeight], [chimneyRight, chimneyTop], [chimneyLeft, chimneyTop]],
+        (x, y) => v3(x, y, chimneyFrontZ), shellMat, "烟道前挡板·正面", true, PANEL_THICKNESS, -1
+      );
+      addPlanarFace(
+        [[chimneySideBackZ, rearHeight], [chimneySideFrontZ, rearHeight], [chimneySideFrontZ, chimneyTop], [chimneySideBackZ, chimneyTop]],
+        (z, y) => v3(chimneyLeft, y, z), shellMat, "烟道左侧板·左侧面", true, PANEL_THICKNESS, -1
+      );
+      addPlanarFace(
+        [[chimneySideBackZ, rearHeight], [chimneySideFrontZ, rearHeight], [chimneySideFrontZ, chimneyTop], [chimneySideBackZ, chimneyTop]],
+        (z, y) => v3(chimneyRight, y, z), shellMat, "烟道右侧板·右侧面", true, PANEL_THICKNESS, 1
+      );
+    }
+
+    const amount = state.surfaceType === "flat" ? 0 : 100;
+    const frontPoint = (u, profile) => v3(
+      THREE.MathUtils.lerp(THREE.MathUtils.lerp(chimneyLeft, chimneyRight, u), THREE.MathUtils.lerp(-width / 2, width / 2, u), profile.spread),
+      THREE.MathUtils.lerp(startY, rearHeight, profile.drop),
+      THREE.MathUtils.lerp(chimneyFrontZ, frontZ, profile.spread)
+    );
+    const leftPoint = (u, profile) => v3(
+      THREE.MathUtils.lerp(chimneyLeft, -width / 2, profile.spread),
+      THREE.MathUtils.lerp(startY, rearHeight, profile.drop),
+      THREE.MathUtils.lerp(THREE.MathUtils.lerp(backZ, chimneyFrontZ, u), THREE.MathUtils.lerp(backZ, frontZ, u), profile.spread)
+    );
+    const rightPoint = (u, profile) => v3(
+      THREE.MathUtils.lerp(chimneyRight, width / 2, profile.spread),
+      THREE.MathUtils.lerp(startY, rearHeight, profile.drop),
+      THREE.MathUtils.lerp(THREE.MathUtils.lerp(backZ, chimneyFrontZ, u), THREE.MathUtils.lerp(backZ, frontZ, u), profile.spread)
+    );
+    addTransitionSurface("装饰曲面·正面", frontPoint, transitionMat, amount);
+    addTransitionSurface("装饰曲面·左侧面", leftPoint, transitionMat, amount, true);
+    addTransitionSurface("装饰曲面·右侧面", rightPoint, transitionMat, amount, true);
+
+    const trimStyles = state.trimStyles || {
+      top: state.trimStyle || "none",
+      start: state.trimStyle || "none",
+      hoodTop: state.trimStyle || "none",
+      hoodBottom: state.trimStyle || "none",
+    };
+    const topPath = [
+      v3(chimneyLeft, chimneyTop, chimneyBack),
+      v3(chimneyLeft, chimneyTop, chimneyFrontZ),
+      v3(chimneyRight, chimneyTop, chimneyFrontZ),
+      v3(chimneyRight, chimneyTop, chimneyBack),
+    ];
+    const startPath = [
+      v3(chimneyLeft, startY, chimneyBack),
+      v3(chimneyLeft, startY, chimneyFrontZ),
+      v3(chimneyRight, startY, chimneyFrontZ),
+      v3(chimneyRight, startY, chimneyBack),
+    ];
+    const upperPath = [
+      v3(-width / 2, rearHeight, backZ),
+      v3(-width / 2, rearHeight, frontZ),
+      v3(width / 2, rearHeight, frontZ),
+      v3(width / 2, rearHeight, backZ),
+    ];
+    const lowerPath = [v3(-width / 2, 0, backZ), v3(-width / 2, bottomFrontY, frontZ)];
+    if (notchEnabled) {
+      lowerPath.push(v3(notchLeft, bottomFrontY, frontZ));
+      for (const [x, y] of [...notchContour].reverse().slice(1)) {
+        lowerPath.push(v3(x, y, frontZ));
+      }
+    }
+    lowerPath.push(v3(width / 2, bottomFrontY, frontZ), v3(width / 2, 0, backZ));
+    if (trimStyles.top && trimStyles.top !== "none") {
+      addProfileTrim(topPath, -1, trimProfile(trimStyles.top), trimMat, "烟道顶部装饰条");
+    }
+    if (trimStyles.start && trimStyles.start !== "none" && chimneyTop - startY >= TRIM_WIDTH) {
+      addProfileTrim(startPath, 1, trimProfile(trimStyles.start), trimMat, "装饰曲面起点装饰条");
+    }
+    if (trimStyles.hoodTop && trimStyles.hoodTop !== "none") {
+      addProfileTrim(upperPath, -1, trimProfile(trimStyles.hoodTop), trimMat, "下横顶边装饰条");
+    }
+    if (trimStyles.hoodBottom && trimStyles.hoodBottom !== "none") {
+      addProfileTrim(lowerPath, 1, trimProfile(trimStyles.hoodBottom), trimMat, "下横底边装饰条", {
+        startNormal: v3(0, 0, 1),
+        endNormal: v3(0, 0, -1),
+      });
+    }
+  }
+
+  function modelCenter() {
+    const total = state.rearHeight + state.chimneyHeight + state.shimHeight;
+    return v3(0, total * 0.48, -state.hoodDepth * 0.52);
+  }
+
+  function currentBox() {
+    if (!model) return null;
+    const box = new THREE.Box3().setFromObject(model);
+    return box.isEmpty() ? null : box;
+  }
+
+  function distanceFor(box) {
+    const size = box.getSize(new THREE.Vector3());
+    const aspect = Math.max(0.2, camera.aspect || 1);
+    const extent = aspectFit
+      ? Math.max(size.x / aspect, size.y, size.z)
+      : Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * Math.PI / 180;
+    return (extent / 2) / Math.tan(fov / 2) * fitMargin;
+  }
+
+  // 按当前观察方向精确计算距离，保证整个模型都在画面内（避免斜视角切边）
+  function distanceForView(box, target, direction, margin = 1.08) {
+    const fovV = camera.fov * Math.PI / 180;
+    const tanV = Math.tan(fovV / 2);
+    const tanH = tanV * Math.max(0.2, camera.aspect);
+    const forward = direction.clone().negate();
+    const worldUp = v3(0, 1, 0);
+    let right = new THREE.Vector3().crossVectors(forward, worldUp);
+    if (right.lengthSq() < 1e-6) right = new THREE.Vector3().crossVectors(forward, v3(1, 0, 0));
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    const corner = new THREE.Vector3();
+    let distance = 0;
+    for (let ix = 0; ix < 2; ix += 1) {
+      for (let iy = 0; iy < 2; iy += 1) {
+        for (let iz = 0; iz < 2; iz += 1) {
+          corner.set(
+            ix ? box.max.x : box.min.x,
+            iy ? box.max.y : box.min.y,
+            iz ? box.max.z : box.min.z
+          ).sub(target);
+          const along = corner.dot(direction);
+          const x = Math.abs(corner.dot(right)) * margin / tanH;
+          const y = Math.abs(corner.dot(up)) * margin / tanV;
+          distance = Math.max(distance, along + Math.max(x, y));
+        }
+      }
+    }
+    return Math.max(120, distance);
+  }
+
+  function viewFrom(box, target, dir, margin = 1.08) {
+    const direction = dir.clone().normalize();
+    return {
+      target,
+      position: target.clone().addScaledVector(direction, distanceForView(box, target, direction, margin)),
+    };
+  }
+
+  function viewPreset(name) {
+    const box = currentBox();
+    if (!box) return null;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const distance = distanceFor(box);
+    if (name === "front") {
+      return {
+        target: center.clone(),
+        position: center.clone().add(v3(0, size.y * 0.06, distance)),
+      };
+    }
+    if (name === "side") {
+      return {
+        target: center.clone(),
+        position: center.clone().add(v3(distance, size.y * 0.04, 0)),
+      };
+    }
+    if (name === "under") {
+      return {
+        target: center.clone().add(v3(0, -size.y * 0.06, 0)),
+        position: center.clone().add(v3(0, -size.y * 0.78, -distance * 0.9)),
+      };
+    }
+
+    // 四个 Tab 的默认观察角度：先对准正在修改的部分，2 秒后回到用户原视角
+    if (name === "upper") {
+      const target = center.clone().add(v3(0, size.y * 0.2, 0));
+      return viewFrom(box, target, v3(0.45, 0.45, 1), 1.08);
+    }
+    if (name === "lower") {
+      const target = center.clone().add(v3(0, -size.y * 0.14, 0));
+      return viewFrom(box, target, v3(0.2, -0.12, 1), 1.08);
+    }
+    if (name === "curve") {
+      const target = center.clone().add(v3(0, size.y * 0.02, 0));
+      return viewFrom(box, target, v3(1.0, 0.22, 0.35), 1.02);
+    }
+    if (name === "trim") {
+      const target = center.clone().add(v3(0, size.y * 0.02, 0));
+      return viewFrom(box, target, v3(0.42, 0.05, 1), 1.02);
+    }
+    if (name === "notch") {
+      const target = center.clone().add(v3(0, -size.y * 0.26, 0));
+      return viewFrom(box, target, v3(0.22, 0.08, 1), 1.25);
+    }
+
+    // 单个尺寸项：把相机对准对应的位置
+    const shim = clamp(state.shimHeight, 0, 60);
+    const lowerTop = state.rearHeight + PANEL_THICKNESS + shim;
+    const depth = state.hoodDepth + PANEL_THICKNESS;
+    const backZ = -depth;
+    const width = state.hoodWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
+    const lowerBox = new THREE.Box3(
+      new THREE.Vector3(-width / 2, 0, backZ),
+      new THREE.Vector3(width / 2, lowerTop, 0)
+    );
+    const lowerCenter = lowerBox.getCenter(new THREE.Vector3());
+
+    if (name === "hoodWidth") {
+      return viewFrom(lowerBox, lowerCenter, v3(0, 0.03, 1), 1.42);
+    }
+    if (name === "hoodDepth") {
+      return viewFrom(lowerBox, lowerCenter, v3(1, 0.03, 0), 1.42);
+    }
+    if (name === "rearHeight") {
+      return viewFrom(lowerBox, lowerCenter, v3(1, 0.1, -0.06), 1.36);
+    }
+    if (name === "frontHeight") {
+      return viewFrom(lowerBox, lowerCenter, v3(0.16, -0.06, 1), 1.36);
+    }
+    if (name === "shim") {
+      const target = new THREE.Vector3(center.x, lowerTop - 40, center.z);
+      return viewFrom(lowerBox, target, v3(0.3, -0.5, -0.8), 1.45);
+    }
+    if (name === "chimneyHeight") {
+      const target = new THREE.Vector3(center.x, lowerTop + state.chimneyHeight * 0.45, center.z);
+      return viewFrom(box, target, v3(0.4, 0.3, 1), 1.06);
+    }
+    return null;
+  }
+
+  function cancelTween() {
+    if (viewTween) clearTimeout(viewTween);
+    viewTween = 0;
+  }
+
+  function tweenCamera(position, target, duration = 480, done) {
+    cancelTween();
+    const fromTarget = controls.target.clone();
+    const fromOffset = camera.position.clone().sub(fromTarget);
+    const toOffset = position.clone().sub(target);
+    const fromSph = new THREE.Spherical().setFromVector3(fromOffset);
+    const toSph = new THREE.Spherical().setFromVector3(toOffset);
+    // 方位角走最短方向，避免绕远路
+    let deltaTheta = toSph.theta - fromSph.theta;
+    while (deltaTheta > Math.PI) deltaTheta -= Math.PI * 2;
+    while (deltaTheta < -Math.PI) deltaTheta += Math.PI * 2;
+    const sph = new THREE.Spherical();
+    const start = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / duration);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      controls.target.lerpVectors(fromTarget, target, eased);
+      // 按球坐标插值：俯仰角单调变化，不会先冲过头再弹回来
+      sph.radius = fromSph.radius + (toSph.radius - fromSph.radius) * eased;
+      sph.phi = fromSph.phi + (toSph.phi - fromSph.phi) * eased;
+      sph.theta = fromSph.theta + deltaTheta * eased;
+      camera.position.setFromSpherical(sph).add(controls.target);
+      controls.update();
+      renderer.render(scene, camera);
+      if (t < 1) {
+        viewTween = window.setTimeout(step, 16);
+      } else {
+        viewTween = 0;
+        done?.();
+      }
+    };
+    viewTween = window.setTimeout(step, 0);
+  }
+
+  function clearFocus() {
+    clearTimeout(focusTimer);
+    focusTimer = 0;
+    cancelTween();
+    clearMeasure();
+    savedView = null;
+    focusName = "";
+  }
+
+  function restoreFocus() {
+    clearMeasure();
+    if (!savedView) return;
+    const box = currentBox();
+    if (!box) {
+      savedView = null;
+      focusName = "";
+      return;
+    }
+    const center = box.getCenter(new THREE.Vector3());
+    const distance = distanceFor(box);
+    tweenCamera(
+      center.clone().addScaledVector(savedView.direction, distance),
+      center.clone(),
+      480,
+      () => {
+        savedView = null;
+        focusName = "";
+      }
+    );
+  }
+
+  function clearMeasure() {
+    if (!measureLine) return;
+    scene.remove(measureLine);
+    measureLine.geometry.dispose();
+    measureLine.material.dispose();
+    measureLine = null;
+    if (renderer && scene && camera) renderer.render(scene, camera);
+  }
+
+  // 选中某个尺寸时，在模型上画一条绿色标注线，指出量的是哪一段
+  function measurePoints(name) {
+    const shim = clamp(state.shimHeight, 0, 60);
+    const width = state.hoodWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
+    const depth = state.hoodDepth + PANEL_THICKNESS;
+    const backZ = -depth;
+    const frontZ = 0;
+    const rearHeight = state.rearHeight + PANEL_THICKNESS + shim;
+    const frontHeight = state.frontHeight + PANEL_THICKNESS + shim;
+    const bottomFrontY = rearHeight - frontHeight;
+    const out = 18;
+    const cap = 10;
+    const v = (x, y, z) => new THREE.Vector3(x, y, z);
+    const pts = [];
+    const seg = (a, b) => { pts.push(a, b); };
+    if (name === "hoodWidth") {
+      const y = bottomFrontY - out;
+      const z = frontZ + out;
+      seg(v(-width / 2, y, z), v(width / 2, y, z));
+      seg(v(-width / 2, y - cap, z), v(-width / 2, y + cap, z));
+      seg(v(width / 2, y - cap, z), v(width / 2, y + cap, z));
+    } else if (name === "hoodDepth") {
+      const x = width / 2 + out;
+      const y = out;
+      seg(v(x, y, backZ), v(x, y, frontZ));
+      seg(v(x - cap, y, backZ), v(x + cap, y, backZ));
+      seg(v(x - cap, y, frontZ), v(x + cap, y, frontZ));
+    } else if (name === "rearHeight") {
+      const x = width / 2 + out;
+      const z = backZ - out;
+      seg(v(x, 0, z), v(x, rearHeight, z));
+      seg(v(x, 0, z - cap), v(x, 0, z + cap));
+      seg(v(x, rearHeight, z - cap), v(x, rearHeight, z + cap));
+    } else if (name === "frontHeight") {
+      const x = width / 2 + out;
+      const z = frontZ + out;
+      seg(v(x, bottomFrontY, z), v(x, rearHeight, z));
+      seg(v(x, bottomFrontY, z - cap), v(x, bottomFrontY, z + cap));
+      seg(v(x, rearHeight, z - cap), v(x, rearHeight, z + cap));
+    } else if (name === "shim") {
+      const x = width / 2 + out;
+      const z = backZ - out;
+      const top = rearHeight - PANEL_THICKNESS;
+      const bottom = top - Math.max(shim, 4);
+      seg(v(x, bottom, z), v(x, top, z));
+      seg(v(x, bottom, z - cap), v(x, bottom, z + cap));
+      seg(v(x, top, z - cap), v(x, top, z + cap));
+    }
+    return pts;
+  }
+
+  function showMeasure(name) {
+    clearMeasure();
+    const pts = measurePoints(name);
+    if (!pts.length) return;
+    const geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x1f6b4a, transparent: true, opacity: 0.95, depthTest: false,
+    });
+    measureLine = new THREE.LineSegments(geometry, material);
+    measureLine.renderOrder = 999;
+    scene.add(measureLine);
+    renderer.render(scene, camera);
+  }
+
+  function focusView(name, hold = 2000) {
+    const preset = viewPreset(name);
+    if (!preset) return;
+    if (!savedView) {
+      const direction = camera.position.clone().sub(controls.target);
+      if (direction.lengthSq() > 1e-6) savedView = { direction: direction.normalize() };
+    }
+    clearTimeout(focusTimer);
+    showMeasure(name);
+    // 已经在目标视角时只延长停留时间，避免连点 + 时反复重播动画
+    if (focusName === name && !viewTween) {
+      focusTimer = window.setTimeout(restoreFocus, hold);
+      return;
+    }
+    focusName = name;
+    cancelTween();
+    tweenCamera(preset.position, preset.target, 480, () => {
+      clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(restoreFocus, hold);
+    });
+  }
+
+  function dimMaterialFor(material) {
+    let dim = dimMaterials.get(material);
+    if (!dim) {
+      dim = material.clone();
+      dim.transparent = true;
+      dim.depthWrite = !material.isLineBasicMaterial;
+      dim.userData.restoreOpacity = material.opacity ?? 1;
+      dimMaterials.set(material, dim);
+    }
+    // 每次闪烁都从 5% 开始，统一由同一段渐显动画恢复。
+    dim.opacity = 0.05;
+    return dim;
+  }
+
+  function finishFlash() {
+    clearTimeout(flashTimer);
+    flashTimer = 0;
+    for (const item of flashItems) {
+      if (item.mesh.userData.baseMaterial === item.base) {
+        item.mesh.material = item.base;
+        delete item.mesh.userData.baseMaterial;
+      }
+      item.clone.dispose();
+    }
+    flashItems.length = 0;
+  }
+
+  // 闪烁结束后，所有被压暗的部件共用同一个时间轴，从 5% 一起渐显回各自原始透明度。
+  function fadeInHighlight(duration = 480) {
+    finishFlash();
+    if (!model) return;
+    const entries = new Map();
+    for (const child of model.children) {
+      if (child.userData.baseMaterial && child.material) {
+        const material = child.material;
+        entries.set(material, material.userData.restoreOpacity ?? 1);
+      }
+    }
+    if (!entries.size) {
+      renderer?.render(scene, camera);
+      return;
+    }
+    const start = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / duration);
+      const eased = t * t * (3 - 2 * t);
+      for (const [material, targetOpacity] of entries) {
+        material.opacity = 0.05 + (targetOpacity - 0.05) * eased;
+      }
+      renderer.render(scene, camera);
+      if (t < 1) {
+        restoreFadeTimer = window.setTimeout(step, 16);
+      } else {
+        restoreFadeTimer = 0;
+        restoreHighlight();
+      }
+    };
+    restoreFadeTimer = window.setTimeout(step, 0);
+  }
+
+  function restoreHighlight() {
+    clearTimeout(restoreFadeTimer);
+    restoreFadeTimer = 0;
+    finishFlash();
+    if (!model) return;
+    for (const child of model.children) {
+      if (child.userData.baseMaterial) {
+        child.material = child.userData.baseMaterial;
+        delete child.userData.baseMaterial;
+      }
+    }
+    if (renderer && scene && camera) renderer.render(scene, camera);
+  }
+
+  function highlightPart(part) {
+    if (!model) return;
+    restoreHighlight();
+    // 高亮时把「这一组自己的装饰条」一起算进来：
+    // 否则装饰条会在已经实心的板面上单独渐显，看起来像慢半拍。
+    const matchers = {
+      upper: (name) => (name.startsWith("烟道") && !name.includes("装饰条")) || name === "烟道顶部装饰条",
+      lower: (name) => (name.startsWith("下横") && !name.includes("装饰条")) || name.startsWith("内部垫高")
+        || name === "下横顶边装饰条" || name === "下横底边装饰条",
+      curve: (name) => (name.startsWith("装饰曲面") && !name.includes("装饰条")) || name === "装饰曲面起点装饰条",
+      trim: (name) => name.includes("装饰条"),
+      notch: (name) => name.startsWith("下横前挡板"),
+      decor: (name) => name.startsWith("装饰曲面") || name.includes("装饰条"),
+    };
+    const match = matchers[part];
+    if (!match) return;
+    const targets = model.children.filter((child) => match(child.name));
+    if (!targets.length) return;
+    for (const child of model.children) {
+      if (!child.isMesh && !child.isLine) continue;
+      if (match(child.name)) {
+        if (child.isMesh) {
+          const base = child.material;
+          const clone = base.clone();
+          if (clone.emissive) {
+            clone.emissive.setHex(0xffe4c7);
+            clone.emissiveIntensity = 0;
+          }
+          child.userData.baseMaterial = base;
+          child.material = clone;
+          flashItems.push({ mesh: child, base, clone });
+        }
+        continue;
+      }
+      child.userData.baseMaterial = child.material;
+      child.material = dimMaterialFor(child.material);
+    }
+    const start = performance.now();
+    const flashDuration = 1280;
+    const pulses = [[0, 540], [740, 1280]];
+    const step = () => {
+      const elapsed = performance.now() - start;
+      let intensity = 0;
+      for (const [from, to] of pulses) {
+        if (elapsed >= from && elapsed <= to) {
+          const phase = (elapsed - from) / (to - from);
+          intensity = Math.sin(phase * Math.PI) * 0.55;
+          break;
+        }
+      }
+      for (const item of flashItems) {
+        if (item.clone.emissiveIntensity !== undefined) item.clone.emissiveIntensity = intensity;
+      }
+      renderer.render(scene, camera);
+      if (elapsed < flashDuration) {
+        flashTimer = window.setTimeout(step, 16);
+      } else {
+        flashTimer = 0;
+        fadeInHighlight(480);
+      }
+    };
+    flashTimer = window.setTimeout(step, 0);
+    renderer.render(scene, camera);
+  }
+
+  function fitCamera(immediate = false) {
+    if (!model) return;
+    const box = new THREE.Box3().setFromObject(model);
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
+    fitDistance = distanceFor(box);
+    const direction = camera.position.clone().sub(controls.target);
+    if (direction.lengthSq() < 0.0001) direction.copy(initialDirection);
+    direction.normalize();
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(direction, fitDistance);
+    camera.near = Math.max(1, fitDistance / 100);
+    camera.far = fitDistance * 100;
+    camera.updateProjectionMatrix();
+    controls.update();
+    if (immediate) renderer.render(scene, camera);
+  }
+
+  function resize() {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (!width || !height || !renderer) return;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false);
+    if (aspectFit && model && controls) {
+      const box = currentBox();
+      if (box) {
+        const direction = camera.position.clone().sub(controls.target);
+        if (direction.lengthSq() < 0.0001) direction.copy(initialDirection);
+        direction.normalize();
+        const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
+        controls.target.copy(center);
+        fitDistance = distanceFor(box);
+        camera.position.copy(center).addScaledVector(direction, fitDistance);
+        camera.near = Math.max(1, fitDistance / 100);
+        camera.far = fitDistance * 100;
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+    }
+    renderer.render(scene, camera);
+  }
+
+  function render() {
+    if (disposed) return;
+    if (document.hidden || container.offsetParent === null) return;
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  function update(nextState) {
+    restoreHighlight();
+    state = { ...nextState };
+    if (!model) return;
+    const viewDirection = camera.position.clone().sub(controls.target).normalize();
+    model.traverse((object) => {
+      object.geometry?.dispose();
+    });
+    model.clear();
+    buildModel();
+    const box = new THREE.Box3().setFromObject(model);
+    if (!box.isEmpty()) {
+      const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
+      fitDistance = distanceFor(box);
+      controls.target.copy(center);
+      camera.position.copy(center).addScaledVector(viewDirection, fitDistance);
+      camera.near = Math.max(1, fitDistance / 100);
+      camera.far = fitDistance * 100;
+      camera.updateProjectionMatrix();
+      controls.update();
+    }
+    if (focusName) showMeasure(focusName);
+    renderer.render(scene, camera);
+  }
+
+  // 供安装页等外部调用：平滑移动相机 / 回到总览
+  function cameraTo(position, target, duration = 600) {
+    clearFocus();
+    if (!position || !target) return;
+    if (duration <= 0) {
+      cancelTween();
+      controls.target.copy(target);
+      camera.position.copy(position);
+      controls.update();
+      renderer.render(scene, camera);
+      return;
+    }
+    tweenCamera(position.clone(), target.clone(), duration);
+  }
+
+  // 一镜到底：镜头全程连续移动，按时间轴经过关键观察点；只在首尾缓入缓出
+  function cameraPath(frames, duration) {
+    if (!frames || frames.length < 2) return;
+    clearFocus();
+    cancelTween();
+    const times = frames.map((frame) => frame.time ?? 0);
+    const total = (duration ?? times[times.length - 1] * 1000) / 1000;
+    const positionCurve = new THREE.CatmullRomCurve3(frames.map((f) => f.position.clone()), false, "centripetal");
+    const targetCurve = new THREE.CatmullRomCurve3(frames.map((f) => f.target.clone()), false, "centripetal");
+    const segments = frames.length - 1;
+    const edge = Math.min(0.7, total * 0.08);
+    const start = performance.now();
+    const step = () => {
+      const elapsed = Math.min(total, (performance.now() - start) / 1000);
+      let clock = elapsed;
+      if (elapsed < edge) {
+        clock = edge * Math.pow(elapsed / edge, 2);
+      } else if (total - elapsed < edge) {
+        const remain = total - elapsed;
+        clock = total - edge * Math.pow(remain / edge, 2);
+      }
+      let index = 0;
+      while (index < segments - 1 && clock > times[index + 1]) index += 1;
+      const span = Math.max(0.001, times[index + 1] - times[index]);
+      const raw = Math.min(1, Math.max(0, (clock - times[index]) / span));
+      const u = (index + raw) / segments;
+      controls.target.copy(targetCurve.getPoint(u));
+      camera.position.copy(positionCurve.getPoint(u));
+      controls.update();
+      renderer.render(scene, camera);
+      if (elapsed < total) {
+        viewTween = window.setTimeout(step, 16);
+      } else {
+        viewTween = 0;
+      }
+    };
+    viewTween = window.setTimeout(step, 0);
+  }
+
+  function overviewView() {
+    const box = currentBox();
+    if (!box) return null;
+    const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
+    return {
+      target: center.clone(),
+      position: center.clone().addScaledVector(initialDirection, distanceFor(box)),
+    };
+  }
+
+  function cameraOverview(duration = 600) {
+    clearFocus();
+    const box = currentBox();
+    if (!box) return;
+    const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
+    const position = center.clone().addScaledVector(initialDirection, distanceFor(box));
+    cameraTo(position, center, duration);
+  }
+
+  // 安装页使用：整体淡入 / 淡出（裁切时先隐藏罩体）
+  function setModelOpacity(value) {
+    const o = Math.max(0, Math.min(1, value));
+    for (const material of [shellMat, transitionMat, trimMat]) {
+      material.transparent = o < 1;
+      material.opacity = o;
+      material.depthWrite = o >= 1;
+    }
+    edgeMat.transparent = true;
+    edgeMat.opacity = 0.58 * o;
+    if (renderer && scene && camera) renderer.render(scene, camera);
+  }
+
+  function resetView() {
+    clearFocus();
+    const center = modelCenter().add(targetOffset);
+    controls.autoRotate = false;
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(initialDirection, fitDistance);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  function dispose() {
+    disposed = true;
+    clearMeasure();
+    clearFocus();
+    restoreHighlight();
+    observer?.disconnect();
+    controls?.dispose();
+    model?.traverse((object) => object.geometry?.dispose());
+    shellMat.dispose();
+    transitionMat.dispose();
+    trimMat.dispose();
+    edgeMat.dispose();
+    for (const material of dimMaterials.values()) material.dispose();
+    dimMaterials.clear();
+    renderer?.dispose();
+    renderer?.domElement?.remove();
+  }
+
+  function snapshot() {
+    renderer.render(scene, camera);
+    return renderer.domElement.toDataURL("image/png");
+  }
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(34, 1, 1, 12000);
+  camera.position.copy(modelCenter()).addScaledVector(initialDirection, fitDistance);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = false;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.domElement.setAttribute("aria-label", "可旋转的烟机罩三维预览");
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, softLighting ? 0xe8e2d8 : 0xd5d4ce, softLighting ? 2.4 : 2.2));
+  const key = new THREE.DirectionalLight(0xffffff, softLighting ? 2.0 : 2.5);
+  key.position.set(-900, 1500, 900);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, softLighting ? 1.35 : 1.15);
+  fill.position.set(1000, 700, 1200);
+  scene.add(fill);
+  if (softLighting) {
+    // 安装页专用：压住正面板和曲面之间的明暗差，保留体积感。
+    const frontFill = new THREE.DirectionalLight(0xffffff, 0.85);
+    frontFill.position.set(0, 450, 1500);
+    scene.add(frontFill);
+  }
+
+  model = new THREE.Group();
+  scene.add(model);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.enableZoom = false;
+  controls.autoRotate = false;
+  controls.autoRotateSpeed = 0.62;
+  controls.minPolarAngle = 0.1;
+  controls.maxPolarAngle = Math.PI - 0.1;
+  controls.addEventListener("start", () => {
+    controls.autoRotate = false;
+    if (savedView) clearFocus();
+  });
+
+  controls.target.copy(modelCenter());
+  buildModel();
+  fitCamera(true);
+
+  observer = new ResizeObserver(resize);
+  observer.observe(container);
+  resize();
+  renderer.setAnimationLoop(render);
+
+  // 安装说明页复用同一个模型：直接读取零件、材质并切换基础色。
+  function getModel() {
+    return model;
+  }
+
+  function getScene() {
+    return scene;
+  }
+
+  function getMaterials() {
+    return { shellMat, transitionMat, trimMat, edgeMat };
+  }
+
+  function setModelColors(colors) {
+    if (colors?.shell) {
+      shellMat.color.set(colors.shell);
+      transitionMat.color.set(colors.shell);
+    }
+    if (colors?.trim) trimMat.color.set(colors.trim);
+  }
+
+  return {
+    update,
+    resetView,
+    focusView,
+    highlightPart,
+    cameraTo,
+    cameraPath,
+    cameraOverview,
+    overviewView,
+    setModelOpacity,
+    dispose,
+    snapshot,
+    getModel,
+    getScene,
+    getMaterials,
+    setModelColors,
+  };
+}
