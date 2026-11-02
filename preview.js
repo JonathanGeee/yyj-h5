@@ -1114,7 +1114,7 @@ export function createPreview(container, initialState, options = {}) {
 
     fitDistance = morph.targetFit;
     controls.target.copy(morph.targetCenter);
-    const finalTheta = morph.startTheta;
+    const finalTheta = morph.startTheta + morph.direction * Math.PI * 2;
     const finalRadius = Math.cos(morph.startElevation) * morph.targetFit;
     const finalY = Math.sin(morph.startElevation) * morph.targetFit;
     camera.position.set(
@@ -1204,11 +1204,7 @@ export function createPreview(container, initialState, options = {}) {
       const t = Math.min(1, (now - morph.started) / duration);
       const target = startTarget.clone().lerp(targetCenter, t);
       const distance = startDist + (targetFit - startDist) * t;
-      // 只在前侧转到侧面再回来，不把贴墙的开口背面转出来。
-      const swing = direction > 0
-        ? Math.PI / 2 - startTheta
-        : Math.PI / 2 + startTheta;
-      const theta = startTheta + direction * swing * Math.sin(Math.PI * t);
+      const theta = startTheta + direction * Math.PI * 2 * t;
       const radius = Math.cos(startElevation) * distance;
       const yOffset = Math.sin(startElevation) * distance;
       camera.position.set(
