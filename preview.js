@@ -34,7 +34,6 @@ export function createPreview(container, initialState, options = {}) {
   let viewTween = 0;
   let flashTimer = 0;
   let restoreFadeTimer = 0;
-  let measureLine = null;
   const flashItems = [];
   const dimMaterials = new Map();
 
@@ -441,9 +440,9 @@ export function createPreview(container, initialState, options = {}) {
     const bottomFrontY = rearHeight - frontHeight;
     const totalHeight = rearHeight + chimneyHeight;
     const startFractions = state.surfaceType === "convex"
-      ? { middle: 0.55, lower: 0.4 }
+      ? { lower: 0.4, lowest: 0.28 }
       : { middle: 0.5, top: 1 };
-    const startY = rearHeight + chimneyHeight * (startFractions[state.surfaceStart] ?? startFractions.middle);
+    const startY = rearHeight + chimneyHeight * (startFractions[state.surfaceStart] ?? startFractions.lower ?? startFractions.middle ?? 0.5);
 
     // 操作豁口：沿用根目录 index.html 的参数与形状
     const notchEnabled = state.notchEnabled ?? true;
@@ -535,7 +534,7 @@ export function createPreview(container, initialState, options = {}) {
       );
     }
 
-    const amount = state.surfaceType === "flat" ? 0 : 100;
+    const amount = state.surfaceType === "flat" || state.surfaceType === "none" ? 0 : 100;
     const frontPoint = (u, profile) => v3(
       THREE.MathUtils.lerp(THREE.MathUtils.lerp(chimneyLeft, chimneyRight, u), THREE.MathUtils.lerp(-width / 2, width / 2, u), profile.spread),
       THREE.MathUtils.lerp(startY, rearHeight, profile.drop),
@@ -554,6 +553,12 @@ export function createPreview(container, initialState, options = {}) {
     addTransitionSurface("装饰曲面·正面", frontPoint, transitionMat, amount);
     addTransitionSurface("装饰曲面·左侧面", leftPoint, transitionMat, amount, true);
     addTransitionSurface("装饰曲面·右侧面", rightPoint, transitionMat, amount, true);
+    if (state.surfaceType === "none") {
+      // 无侧面：前、左、右三块斜面都不做，只保留上方、下方和装饰条。
+      model.children.forEach((child) => {
+        if (child.name.startsWith("装饰曲面·")) child.visible = false;
+      });
+    }
 
     const trimStyles = state.trimStyles || {
       top: state.trimStyle || "none",
@@ -590,7 +595,7 @@ export function createPreview(container, initialState, options = {}) {
     if (trimStyles.top && trimStyles.top !== "none") {
       addProfileTrim(topPath, -1, trimProfile(trimStyles.top), trimMat, "烟道顶部装饰条");
     }
-    if (trimStyles.start && trimStyles.start !== "none" && chimneyTop - startY >= TRIM_WIDTH) {
+    if (trimStyles.start && trimStyles.start !== "none" && state.surfaceType !== "none" && chimneyTop - startY >= TRIM_WIDTH) {
       addProfileTrim(startPath, 1, trimProfile(trimStyles.start), trimMat, "装饰曲面起点装饰条");
     }
     if (trimStyles.hoodTop && trimStyles.hoodTop !== "none") {
@@ -789,13 +794,11 @@ export function createPreview(container, initialState, options = {}) {
     clearTimeout(focusTimer);
     focusTimer = 0;
     cancelTween();
-    clearMeasure();
     savedView = null;
     focusName = "";
   }
 
   function restoreFocus() {
-    clearMeasure();
     if (!savedView) return;
     const box = currentBox();
     if (!box) {
@@ -816,80 +819,6 @@ export function createPreview(container, initialState, options = {}) {
     );
   }
 
-  function clearMeasure() {
-    if (!measureLine) return;
-    scene.remove(measureLine);
-    measureLine.geometry.dispose();
-    measureLine.material.dispose();
-    measureLine = null;
-    if (renderer && scene && camera) renderer.render(scene, camera);
-  }
-
-  // 选中某个尺寸时，在模型上画一条绿色标注线，指出量的是哪一段
-  function measurePoints(name) {
-    const shim = clamp(state.shimHeight, 0, 60);
-    const width = state.hoodWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
-    const depth = state.hoodDepth + PANEL_THICKNESS;
-    const backZ = -depth;
-    const frontZ = 0;
-    const rearHeight = state.rearHeight + PANEL_THICKNESS + shim;
-    const frontHeight = state.frontHeight + PANEL_THICKNESS + shim;
-    const bottomFrontY = rearHeight - frontHeight;
-    const out = 18;
-    const cap = 10;
-    const v = (x, y, z) => new THREE.Vector3(x, y, z);
-    const pts = [];
-    const seg = (a, b) => { pts.push(a, b); };
-    if (name === "hoodWidth") {
-      const y = bottomFrontY - out;
-      const z = frontZ + out;
-      seg(v(-width / 2, y, z), v(width / 2, y, z));
-      seg(v(-width / 2, y - cap, z), v(-width / 2, y + cap, z));
-      seg(v(width / 2, y - cap, z), v(width / 2, y + cap, z));
-    } else if (name === "hoodDepth") {
-      const x = width / 2 + out;
-      const y = out;
-      seg(v(x, y, backZ), v(x, y, frontZ));
-      seg(v(x - cap, y, backZ), v(x + cap, y, backZ));
-      seg(v(x - cap, y, frontZ), v(x + cap, y, frontZ));
-    } else if (name === "rearHeight") {
-      const x = width / 2 + out;
-      const z = backZ - out;
-      seg(v(x, 0, z), v(x, rearHeight, z));
-      seg(v(x, 0, z - cap), v(x, 0, z + cap));
-      seg(v(x, rearHeight, z - cap), v(x, rearHeight, z + cap));
-    } else if (name === "frontHeight") {
-      const x = width / 2 + out;
-      const z = frontZ + out;
-      seg(v(x, bottomFrontY, z), v(x, rearHeight, z));
-      seg(v(x, bottomFrontY, z - cap), v(x, bottomFrontY, z + cap));
-      seg(v(x, rearHeight, z - cap), v(x, rearHeight, z + cap));
-    } else if (name === "shim") {
-      const x = width / 2 + out;
-      const z = backZ - out;
-      const top = rearHeight - PANEL_THICKNESS;
-      const bottom = top - Math.max(shim, 4);
-      seg(v(x, bottom, z), v(x, top, z));
-      seg(v(x, bottom, z - cap), v(x, bottom, z + cap));
-      seg(v(x, top, z - cap), v(x, top, z + cap));
-    }
-    return pts;
-  }
-
-  function showMeasure(name) {
-    clearMeasure();
-    const pts = measurePoints(name);
-    if (!pts.length) return;
-    const geometry = new THREE.BufferGeometry().setFromPoints(pts);
-    const material = new THREE.LineBasicMaterial({
-      color: 0x1f6b4a, transparent: true, opacity: 0.95, depthTest: false,
-    });
-    measureLine = new THREE.LineSegments(geometry, material);
-    measureLine.renderOrder = 999;
-    scene.add(measureLine);
-    renderer.render(scene, camera);
-  }
-
   function focusView(name, hold = 2000) {
     const preset = viewPreset(name);
     if (!preset) return;
@@ -898,7 +827,6 @@ export function createPreview(container, initialState, options = {}) {
       if (direction.lengthSq() > 1e-6) savedView = { direction: direction.normalize() };
     }
     clearTimeout(focusTimer);
-    showMeasure(name);
     // 已经在目标视角时只延长停留时间，避免连点 + 时反复重播动画
     if (focusName === name && !viewTween) {
       focusTimer = window.setTimeout(restoreFocus, hold);
@@ -1123,7 +1051,6 @@ export function createPreview(container, initialState, options = {}) {
       camera.updateProjectionMatrix();
       controls.update();
     }
-    if (focusName) showMeasure(focusName);
     renderer.render(scene, camera);
   }
 
@@ -1225,7 +1152,6 @@ export function createPreview(container, initialState, options = {}) {
 
   function dispose() {
     disposed = true;
-    clearMeasure();
     clearFocus();
     restoreHighlight();
     observer?.disconnect();

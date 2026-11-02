@@ -23,7 +23,7 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
 body {
   margin: 0;
   color: var(--ink);
@@ -33,6 +33,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  touch-action: manipulation;
 }
 body.sheet-open { overflow: hidden; }
 body::before {
@@ -514,13 +515,13 @@ h2 {
 }
 .stepper button:active { background: var(--green-soft); }
 .stepper input {
-  width: 45px;
+  width: 48px;
   padding: 0;
   border: 0;
   outline: 0;
   color: var(--ink);
   background: transparent;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 650;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -577,31 +578,45 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   margin-top: 8px;
 }
 .notch-option {
-  height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 68px;
+  padding: 8px 5px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 13px;
   color: var(--ink-2);
   background: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  text-align: center;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.notch-option svg { width: 100%; height: 35px; flex: none; }
+.notch-option b { margin-top: 3px; font-size: 10.5px; font-weight: 600; }
 .notch-option.is-active {
   border-color: var(--green);
-  color: #ffffff;
-  background: var(--green);
+  color: var(--green);
+  background: var(--green-soft);
+  box-shadow: 0 0 0 3px rgba(36, 92, 69, 0.07);
 }
+.notch-option.is-active b { color: var(--green); }
 
-.curve-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.curve-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .curve-option {
-  padding: 9px 5px 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 68px;
+  padding: 8px 5px 6px;
   border: 1.5px solid var(--line);
   border-radius: 13px;
   background: #fff;
   text-align: center;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
-.curve-option svg { width: 100%; height: 42px; margin: 0 auto; }
+.curve-option svg { width: 100%; height: 35px; flex: none; margin: 0 auto; }
 .curve-option b { display: block; margin-top: 3px; font-size: 10.5px; font-weight: 600; }
 .curve-option.is-active { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 3px rgba(36, 92, 69, 0.07); }
 .curve-option.is-active b { color: var(--green); }
@@ -678,8 +693,8 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   border-radius: 999px;
   color: var(--muted);
   background: #ffffff;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .appbar-spacer { flex: none; width: 38px; height: 38px; }
@@ -793,21 +808,6 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .order-detail-wechat { margin: 10px 0 0; color: var(--muted); font-size: 10px; }
 .order-detail-wechat b { color: var(--ink-2); font-weight: 600; }
-.mini-install-replay {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
-  padding: 6px 12px;
-  border: 1px solid rgba(36, 92, 69, 0.18);
-  border-radius: 999px;
-  color: var(--green);
-  background: #fff;
-  font-size: 11px;
-  font-weight: 600;
-}
-.mini-install-replay svg { width: 13px; height: 13px; }
 
 .order-detail-bar {
   position: fixed;
@@ -923,7 +923,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   border-radius: 15px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   -webkit-backdrop-filter: blur(8px);
@@ -932,9 +932,9 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .install-tabs button span {
   color: var(--faint);
-  font-size: 8px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   line-height: 1;
 }
 .install-tabs button[aria-selected="true"] {
@@ -1008,20 +1008,48 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 
 /* ---------- 半屏安装说明 ---------- */
+.sheet.sheet--install {
+  background: #f7f6f2;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.sheet.sheet--install .sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 10px;
+  padding-top: 8px;
+  background: linear-gradient(to top, #f7f6f2 72%, rgba(247, 246, 242, 0.88) 100%);
+}
+.sheet.sheet--install .sheet-actions .btn {
+  height: 50px;
+  font-size: 15px;
+  font-weight: 650;
+}
 .mini-install { display: flex; flex-direction: column; gap: 9px; }
 .mini-install-tabs { display: flex; gap: 4px; }
 .mini-install-tabs button {
   flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-width: 0;
-  height: 32px;
+  height: 36px;
   padding: 0 3px;
   border: 1px solid rgba(214, 204, 187, 0.7);
   border-radius: 10px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.76);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+}
+.mini-install-tabs button .mini-install-step {
+  flex: none;
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 700;
 }
 .mini-install-tabs button[aria-selected="true"] {
   border-color: var(--green);
@@ -1029,6 +1057,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   background: var(--green);
   box-shadow: 0 5px 12px rgba(36, 92, 69, 0.16);
 }
+.mini-install-tabs button[aria-selected="true"] .mini-install-step { color: rgba(255, 255, 255, 0.66); }
 .mini-install-stage {
   position: relative;
   width: 100%;
@@ -1066,7 +1095,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 
 /* ---------- 收货信息 ---------- */
-#checkoutForm { padding: 14px 16px 40px; }
+#checkoutForm { padding: 14px 16px 120px; }
 .form-card { padding: 2px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: 0 8px 22px rgba(74, 55, 31, 0.035); }
 .field { display: block; padding: 12px 0; border-bottom: 1px solid #eceee9; }
 .field:last-child { border-bottom: 0; }
@@ -1079,7 +1108,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   outline: 0;
   color: var(--ink);
   background: transparent;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   resize: none;
 }
@@ -1099,7 +1128,29 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .order-total span { color: var(--muted); font-size: 10px; }
 .order-total b { color: var(--green); font-family: var(--serif); font-size: 22px; font-weight: 600; }
 .form-error { min-height: 16px; margin: 8px 2px 2px; color: var(--danger); font-size: 10.5px; }
-#checkoutSubmit { margin-top: 4px; }
+
+.flow-footer {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, #f7f6f2 68%, rgba(247, 246, 242, 0));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.flow-footer .btn {
+  width: 100%;
+  height: 48px;
+  font-size: 14px;
+  pointer-events: auto;
+}
+.flow-footer .btn-text { height: 40px; font-size: 12px; }
 
 /* ---------- 支付 ---------- */
 .pay-head { padding: 10px 22px 15px; text-align: center; }
@@ -1117,13 +1168,15 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .qr-hint { margin: 8px 0 0; color: var(--muted); font-size: 9px; }
 .pay-order { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eceee9; color: var(--muted); font-size: 9.5px; }
 .pay-order b { margin-left: 4px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-#payDone { width: calc(100% - 32px); margin: 14px 16px 0; }
-.view[data-view="pay"] > .micro-note { margin: 10px 16px 30px; }
+.pay-guide { margin: 12px 16px 0; padding: 10px 12px; border-radius: 14px; color: var(--ink-2); background: var(--green-soft); font-size: 10.5px; line-height: 1.6; text-align: center; }
+.pay-guide b { color: var(--green); font-weight: 650; }
+.view[data-view="pay"] { padding-bottom: 110px; }
+#payDone { width: 100%; margin: 0; }
 
 /* ---------- 完成 ---------- */
 .view[data-view="done"] { display: none; }
 .view[data-view="done"].is-active { display: flex; align-items: center; justify-content: center; }
-.done-wrap { width: 100%; padding: 40px 24px calc(40px + env(safe-area-inset-bottom)); text-align: center; }
+.done-wrap { width: 100%; padding: 40px 24px calc(150px + env(safe-area-inset-bottom)); text-align: center; }
 .done-check {
   display: grid;
   place-items: center;
@@ -1453,14 +1506,15 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .bar-guide {
   flex: none;
   height: 50px;
-  padding: 0 6px;
+  padding: 0 18px;
   border: 0;
+  border-radius: 999px;
   color: var(--green);
-  background: transparent;
-  font-size: 11px;
-  font-weight: 600;
+  background: var(--green-soft);
+  font-size: 15.5px;
+  font-weight: 650;
   white-space: nowrap;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 .bar-link { padding: 1px 0; border: 0; color: var(--green); background: transparent; font-size: 10px; font-weight: 600; line-height: 1.5; }
 .bar-link.danger { color: var(--danger); }
@@ -1721,4 +1775,12 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   .case-name { font-size: 27px; }
   .case-meta { right: 110px; }
   .case-3d { width: 86px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

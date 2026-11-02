@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#f6f0e6" />
     <meta name="format-detection" content="telephone=no" />
     <title>烟罩实验室 · 给油烟机换一件合身的衣服</title>
@@ -138,17 +138,18 @@
               <div id="notchDims" class="dim-list"></div>
             </div>
             <div id="decorPanel" class="custom-panel" data-panel="decor" role="tabpanel">
-              <div class="panel-label">弯曲方向</div>
+              <div class="panel-label">侧面装饰</div>
               <div id="curveOptions" class="curve-options"></div>
-              <div class="panel-label" id="startLabel">弯曲起始点</div>
+              <div class="panel-label" id="startLabel">侧面起始点</div>
               <div id="startOptions" class="segmented"></div>
+              <p class="panel-hint" id="startHint" hidden></p>
               <div class="panel-label">装饰条</div>
               <div id="trimList" class="trim-list"></div>
             </div>
           </div>
           <div class="custom-buybar">
             <button class="bar-guide" id="installGuideBtn" type="button">安装说明</button>
-            <button class="btn btn-primary btn-buy" id="nextBtn" type="button">定制好了</button>
+            <button class="btn btn-primary btn-buy" id="nextBtn" type="button">去下单</button>
           </div>
         </div>
       </section>
@@ -168,16 +169,16 @@
         </header>
 
         <nav class="install-tabs" id="installTabs" role="tablist" aria-label="安装步骤">
-          <button role="tab" aria-selected="true" data-key="base" type="button"><span>01</span>主体拼接</button>
-          <button role="tab" aria-selected="false" data-key="curve" type="button"><span>02</span>曲面装饰</button>
-          <button role="tab" aria-selected="false" data-key="trim" type="button"><span>03</span>装饰条</button>
-          <button role="tab" aria-selected="false" data-key="paint" type="button"><span>04</span>刷漆</button>
+          <button role="tab" aria-selected="true" data-key="base" type="button"><span>①</span>主体拼接</button>
+          <button role="tab" aria-selected="false" data-key="curve" type="button"><span>②</span>曲面装饰</button>
+          <button role="tab" aria-selected="false" data-key="trim" type="button"><span>③</span>装饰条</button>
+          <button role="tab" aria-selected="false" data-key="paint" type="button"><span>④</span>刷漆</button>
         </nav>
 
         <div class="install-copy" id="installCopy" aria-live="polite">
           <div class="install-copy-text">
-            <h2 id="installTitle">先把 7 块板拼成主体</h2>
-            <p id="installDesc">下横 4 块先围合，再把上竖 3 块从上方插入，接缝处点 502 胶固定。</p>
+            <h2 id="installTitle">主体按顺序拼装</h2>
+            <p id="installDesc">有垫高先贴垫板，再装侧板、顶板、正面。</p>
           </div>
           <button id="replayBtn" class="replay-btn" type="button" aria-label="重播动画" title="重播动画">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 9a6 6 0 1 1 1.4 5.4M4 4v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -216,7 +217,9 @@
           </div>
 
           <p class="form-error" id="formError" role="alert"></p>
-          <button class="btn btn-primary btn-block" id="checkoutSubmit" type="submit">提交订单，去支付 · <span id="checkoutPriceBtn">¥850</span></button>
+          <div class="flow-footer">
+            <button class="btn btn-primary btn-block" id="checkoutSubmit" type="submit">提交订单，去支付 · <span id="checkoutPriceBtn">¥850</span></button>
+          </div>
         </form>
       </section>
 
@@ -233,7 +236,7 @@
         <div class="pay-head">
           <p class="eyebrow">PAYMENT</p>
           <h1>扫码支付</h1>
-          <p>请使用微信扫一扫，支付后点击下方按钮。</p>
+          <p>支付后添加客服微信，发送付款截图和订单号。</p>
         </div>
 
         <div class="pay-card">
@@ -258,8 +261,11 @@
           <div class="pay-order">订单号 <b id="payOrderNo">—</b></div>
         </div>
 
-        <button class="btn btn-primary btn-block" id="payDone" type="button">支付好了</button>
-        <p class="micro-note center">支付遇到问题？先别急，加微信联系我们。</p>
+        <p class="pay-guide">客服微信 <b id="payWechat">—</b></p>
+
+        <div class="flow-footer">
+          <button class="btn btn-primary btn-block" id="payDone" type="button">已支付去添加客服</button>
+        </div>
       </section>
 
       <!-- ============ 完成 ============ -->
@@ -277,9 +283,10 @@
             <div><span>微信号</span><b id="doneWechat">—</b><button type="button" data-copy-target="doneWechat">复制</button></div>
           </div>
 
+        </div>
+        <div class="flow-footer done-footer">
           <button class="btn btn-primary btn-block" id="copyOrderBtn" type="button">复制订单信息，去微信发送</button>
           <button class="btn btn-text btn-block" id="doneHome" type="button">返回首页</button>
-          <p class="micro-note center">订单已保存。添加好友后发送截图，客服会确认排期。</p>
         </div>
       </section>
 

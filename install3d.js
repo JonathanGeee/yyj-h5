@@ -667,7 +667,9 @@ export function createInstallScene(container, initialState, options = {}) {
   /* ---------- 3 块曲面装饰 ---------- */
 
   function hasCurve() {
-    return curveItems.length > 0 && initialState.surfaceType !== "flat";
+    return curveItems.length > 0
+      && initialState.surfaceType !== "flat"
+      && initialState.surfaceType !== "none";
   }
 
   function curveAway(item) {
@@ -689,6 +691,10 @@ export function createInstallScene(container, initialState, options = {}) {
   }
 
   function snapCurve() {
+    if (initialState.surfaceType === "none") {
+      hideCurve();
+      return;
+    }
     for (const item of curveItems) {
       item.group.position.copy(item.home);
       item.group.rotation.set(0, 0, 0);
@@ -698,6 +704,10 @@ export function createInstallScene(container, initialState, options = {}) {
 
   function revealCurveAsBase(instant) {
     if (hasCurve()) return;
+    if (initialState.surfaceType === "none") {
+      hideCurve();
+      return;
+    }
     for (const item of curveItems) {
       const away = item.home.clone().add(new THREE.Vector3(0, H * 0.12, 0));
       item.group.visible = true;
@@ -716,6 +726,10 @@ export function createInstallScene(container, initialState, options = {}) {
   }
 
   function playCurve() {
+    if (initialState.surfaceType === "none") {
+      hideCurve();
+      return;
+    }
     if (!hasCurve() || reducedMotion.matches) {
       revealCurveAsBase(true);
       return;
@@ -819,6 +833,12 @@ export function createInstallScene(container, initialState, options = {}) {
   }
 
   function playTrim() {
+    if (!trimItems.length) {
+      snapTrim();
+      preview.setModelOpacity(1);
+      snapOverview();
+      return;
+    }
     if (reducedMotion.matches) {
       snapTrim();
       preview.setModelOpacity(1);

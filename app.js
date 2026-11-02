@@ -13,59 +13,66 @@ const CONFIG = {
 
 const STYLES = [
   {
-    id: "cloud", name: "云朵弧", tone: "暖米", desc: "向内微凹 · 双眼皮",
+    id: "cloud", name: "云朵弧", tone: "暖米", desc: "向内微凹 · 矩形口",
     curve: "concave", start: "middle",
-    dims: { hoodWidth: 900, hoodDepth: 500, rearHeight: 420, frontHeight: 280, chimneyWidth: 320, chimneyDepth: 300, chimneyHeight: 720 },
-    trims: { top: "corner", start: "double", hoodTop: "single", hoodBottom: "single" },
-  },
-  {
-    id: "tall", name: "高弧", tone: "暖米", desc: "高烟道 · 长弧",
-    curve: "concave", start: "top",
-    dims: { hoodWidth: 960, hoodDepth: 490, rearHeight: 400, frontHeight: 260, chimneyWidth: 360, chimneyDepth: 320, chimneyHeight: 820 },
+    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 420, chimneyDepth: 330, chimneyHeight: 720 },
     trims: { top: "corner", start: "single", hoodTop: "double", hoodBottom: "single" },
+    notch: { shape: "rect", width: 320, height: 60, offset: 0 },
   },
   {
-    id: "line", name: "直边梯形", tone: "暖米", desc: "直边梯形 · 单眼皮",
-    curve: "flat", start: "middle",
-    dims: { hoodWidth: 880, hoodDepth: 470, rearHeight: 380, frontHeight: 250, chimneyWidth: 420, chimneyDepth: 320, chimneyHeight: 620 },
-    trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-  },
-  {
-    id: "arch", name: "微拱门", tone: "暖米", desc: "向外微凸 · 单眼皮",
-    curve: "convex", start: "middle",
-    dims: { hoodWidth: 980, hoodDepth: 520, rearHeight: 300, frontHeight: 200, chimneyWidth: 460, chimneyDepth: 360, chimneyHeight: 560 },
-    trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
-  },
-  {
-    id: "retro", name: "海棠边", tone: "暖米", desc: "向内微凹 · 顶角条",
+    id: "tall", name: "高弧", tone: "暖米", desc: "窄身长弧 · 矩形口",
     curve: "concave", start: "top",
-    dims: { hoodWidth: 880, hoodDepth: 470, rearHeight: 400, frontHeight: 270, chimneyWidth: 340, chimneyDepth: 300, chimneyHeight: 680 },
-    trims: { top: "corner", start: "corner", hoodTop: "single", hoodBottom: "single" },
+    dims: { hoodWidth: 820, hoodDepth: 480, rearHeight: 430, frontHeight: 280, chimneyWidth: 260, chimneyDepth: 280, chimneyHeight: 920 },
+    trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
+    notch: { shape: "rect", width: 300, height: 55, offset: 0 },
   },
   {
-    id: "float", name: "悬浮边", tone: "暖米", desc: "方块 · 无装饰条",
+    id: "line", name: "直边梯形", tone: "暖米", desc: "直边梯形 · 细弧口",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 520, rearHeight: 360, frontHeight: 240, chimneyWidth: 640, chimneyDepth: 380, chimneyHeight: 760 },
+    dims: { hoodWidth: 900, hoodDepth: 480, rearHeight: 380, frontHeight: 250, chimneyWidth: 380, chimneyDepth: 300, chimneyHeight: 620 },
+    trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
+    notch: { shape: "arch", width: 380, height: 60, offset: 0 },
+  },
+  {
+    id: "arch", name: "微拱门", tone: "暖米", desc: "圆顶外凸 · 大弧口",
+    curve: "convex", start: "lower",
+    dims: { hoodWidth: 1060, hoodDepth: 520, rearHeight: 360, frontHeight: 250, chimneyWidth: 400, chimneyDepth: 320, chimneyHeight: 460 },
+    trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
+    notch: { shape: "arch", width: 560, height: 160, offset: 0 },
+  },
+  {
+    id: "retro", name: "海棠边", tone: "暖米", desc: "内凹曲面 · 圆角口",
+    curve: "concave", start: "middle",
+    dims: { hoodWidth: 920, hoodDepth: 500, rearHeight: 440, frontHeight: 290, chimneyWidth: 320, chimneyDepth: 300, chimneyHeight: 760 },
+    trims: { top: "corner", start: "double", hoodTop: "single", hoodBottom: "single" },
+    notch: { shape: "rounded", width: 200, height: 80, offset: 0 },
+  },
+  {
+    id: "float", name: "悬浮边", tone: "暖米", desc: "方块直边 · 偏置方口",
+    curve: "flat", start: "middle",
+    dims: { hoodWidth: 1080, hoodDepth: 520, rearHeight: 280, frontHeight: 200, chimneyWidth: 700, chimneyDepth: 400, chimneyHeight: 420 },
     trims: { top: "none", start: "none", hoodTop: "none", hoodBottom: "none" },
+    notch: { shape: "rect", width: 260, height: 55, offset: 90 },
   },
   {
-    id: "crown", name: "方冠", tone: "暖米", desc: "方块 · 顶角条",
+    id: "crown", name: "方冠", tone: "暖米", desc: "方块 · 大弧口",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 1020, hoodDepth: 520, rearHeight: 380, frontHeight: 250, chimneyWidth: 700, chimneyDepth: 400, chimneyHeight: 820 },
+    dims: { hoodWidth: 1080, hoodDepth: 530, rearHeight: 340, frontHeight: 230, chimneyWidth: 760, chimneyDepth: 420, chimneyHeight: 560 },
     trims: { top: "corner", start: "none", hoodTop: "double", hoodBottom: "single" },
+    notch: { shape: "arch", width: 520, height: 150, offset: 0 },
   },
 ];
 
-// 首页案例：替换 image 为 AI 实拍图即可；实拍图建议把 fit 改成 "cover"。
-// name 是案例名；说明行由 STYLES 里的 desc（曲面 + 装饰条）和 tone（颜色）自动生成。
+// 首页案例：大图先用原来的 3D 渲染占位，之后换成 AI 实景图。
+// model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
 const HOME_CASES = [
-  { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.png", model: "assets/styles/cloud.png", fit: "contain" },
-  { styleId: "tall", name: "高弧", image: "assets/styles/tall.png", model: "assets/styles/tall.png", fit: "contain" },
-  { styleId: "line", name: "直边梯形", image: "assets/styles/line.png", model: "assets/styles/line.png", fit: "contain" },
-  { styleId: "arch", name: "微拱门", image: "assets/styles/arch.png", model: "assets/styles/arch.png", fit: "contain" },
-  { styleId: "retro", name: "海棠边", image: "assets/styles/retro.png", model: "assets/styles/retro.png", fit: "contain" },
-  { styleId: "float", name: "悬浮边", image: "assets/styles/float.png", model: "assets/styles/float.png", fit: "contain" },
-  { styleId: "crown", name: "方冠", image: "assets/styles/crown.png", model: "assets/styles/crown.png", fit: "contain" },
+  { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.png", model: "assets/models/cloud.png", fit: "contain" },
+  { styleId: "tall", name: "高弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
+  { styleId: "line", name: "直边梯形", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
+  { styleId: "arch", name: "微拱门", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
+  { styleId: "retro", name: "海棠边", image: "assets/styles/retro.png", model: "assets/models/retro.png", fit: "contain" },
+  { styleId: "float", name: "悬浮边", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
+  { styleId: "crown", name: "方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
 ];
 // 3D 小图的全局兜底；每个案例自己的 model 优先。
 let HOME_3D_IMAGE = "";
@@ -127,7 +134,7 @@ const DIMS = {
   hoodWidth: { label: "烟机宽", hint: "量最外沿", min: 600, max: 1100, step: 10 },
   hoodDepth: { label: "烟机深", hint: "从墙到最外沿", min: 350, max: 650, step: 10 },
   rearHeight: { label: "靠墙侧高", hint: "贴墙那一侧", min: 220, max: 520, step: 10 },
-  frontHeight: { label: "前侧高", hint: "朝外这一侧", min: 120, max: 400, step: 10 },
+  frontHeight: { label: "前侧高", hint: "朝外这一侧", min: 120, max: 520, step: 10 },
   notchWidth: { label: "开口宽", hint: "豁口左右宽度", min: 120, max: 620, step: 10 },
   notchHeight: { label: "开口高", hint: "从底边往上", min: 30, max: 220, step: 10 },
 };
@@ -165,11 +172,15 @@ const CURVES = [
   { id: "concave", label: "向内弯曲" },
   { id: "convex", label: "向外弯曲" },
   { id: "flat", label: "不弯曲" },
+  { id: "none", label: "无侧面" },
 ];
 
 function allowedStarts(type) {
+  if (type === "none") {
+    return [{ id: "middle", label: "中间" }];
+  }
   if (type === "convex") {
-    return [{ id: "middle", label: "中间" }, { id: "lower", label: "中间偏下" }];
+    return [{ id: "lower", label: "中间偏下" }, { id: "lowest", label: "中间更偏下" }];
   }
   if (type === "flat") {
     return [{ id: "middle", label: "中间" }, { id: "top", label: "顶部" }];
@@ -178,6 +189,7 @@ function allowedStarts(type) {
 }
 
 function startLabelFor(type = state.surfaceType, value = state.surfaceStart) {
+  if (value === "lowest") return "中间更偏下";
   if (value === "lower") return "中间偏下";
   if (value === "top") return type === "flat" ? "顶部" : "上面";
   return "中间";
@@ -317,7 +329,27 @@ function trimArt(id) {
   return `<svg viewBox="0 0 64 48">${base}<path d="M11 36h30V16" fill="none" stroke="#c9ae8b" stroke-width="7" stroke-linecap="square"/><path d="M13 33h26" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".55"/></svg>`;
 }
 
+function notchArt(shape) {
+  const outlines = {
+    rect: "M2 3H118V33H80V20H40V33H2Z",
+    rounded: "M2 3H118V33H80V24Q80 20 75 20H45Q40 20 40 24V33H2Z",
+    arch: "M2 3H118V33H80V25A20 12 0 0 0 40 25V33H2Z",
+    trapezoid: "M2 3H118V33H82L74 20H46L38 33H2Z",
+  };
+  return `<svg viewBox="0 0 120 36" aria-hidden="true">
+    <path d="${outlines[shape] || outlines.rect}" fill="rgba(36, 92, 69, 0.1)" stroke="#245c45" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="M2 3H118" stroke="#245c45" stroke-width="1" opacity=".35"/>
+    <path d="M2 33h32M86 33h32" stroke="#245c45" stroke-width="1" stroke-linecap="round" opacity=".35"/>
+  </svg>`;
+}
+
 function curveArt(type) {
+  if (type === "none") {
+    return `<svg viewBox="0 0 72 48" aria-hidden="true">
+      <path d="M24 4 L8 44 H64 L48 4 Z" fill="none" stroke="#245c45" stroke-width="1.2" stroke-dasharray="4 3" opacity=".45"/>
+      <path d="M36 4v40" stroke="#245c45" stroke-width=".8" stroke-dasharray="2 3" opacity=".22"/>
+    </svg>`;
+  }
   const paths = {
     flat: "M24 4 L8 44 H64 L48 4 Z",
     concave: "M24 4 C24 24 8 28 8 44 H64 C64 28 48 24 48 4 Z",
@@ -365,7 +397,7 @@ function sanitizeState(input) {
   }
   if (!STYLES.some((style) => style.id === next.styleId)) next.styleId = DEFAULTS.styleId;
   if (!CURVES.some((curve) => curve.id === next.surfaceType)) next.surfaceType = DEFAULTS.surfaceType;
-  if (!["middle", "top", "lower"].includes(next.surfaceStart)) next.surfaceStart = DEFAULTS.surfaceStart;
+  if (!["middle", "top", "lower", "lowest"].includes(next.surfaceStart)) next.surfaceStart = DEFAULTS.surfaceStart;
   const legacy = input?.trimStyle;
   for (const position of TRIM_POSITIONS) {
     const value = input?.trimStyles?.[position.key] ?? legacy;
@@ -374,6 +406,18 @@ function sanitizeState(input) {
       : DEFAULTS.trimStyles[position.key];
   }
   return next;
+}
+
+// 中间那条装饰条只负责上竖与下方罩体之间的接缝。
+// 无侧面时没有接缝；起点在顶部时接缝就是烟道顶边，所以这条要一起去掉。
+function hasMiddleEdge(config = state) {
+  return config?.surfaceType !== "none" && config?.surfaceStart !== "top";
+}
+
+function activeTrimPositions(config = state) {
+  return hasMiddleEdge(config)
+    ? TRIM_POSITIONS
+    : TRIM_POSITIONS.filter((position) => position.key !== "start");
 }
 
 function normalizeState() {
@@ -385,7 +429,7 @@ function normalizeState() {
   state.chimneyDepth = clamp(state.chimneyDepth, DIMS.chimneyDepth.min, DIMS.chimneyDepth.max);
   state.chimneyHeight = clamp(state.chimneyHeight, DIMS.chimneyHeight.min, DIMS.chimneyHeight.max);
   state.shimHeight = clamp(state.shimHeight, 0, 60);
-  state.frontHeight = Math.min(state.frontHeight, state.rearHeight - 30);
+  state.frontHeight = Math.min(state.frontHeight, state.rearHeight);
   state.chimneyWidth = Math.min(state.chimneyWidth, state.hoodWidth - 40);
   state.chimneyDepth = Math.min(state.chimneyDepth, state.hoodDepth - 30);
   state.notchWidth = clamp(state.notchWidth ?? 420, DIMS.notchWidth.min, Math.min(DIMS.notchWidth.max, state.hoodWidth + 20 - 60));
@@ -400,16 +444,17 @@ function normalizeState() {
 const currentStyle = () => STYLES.find((style) => style.id === state.styleId) || STYLES[0];
 const trimFor = (key) => TRIMS.find((trim) => trim.id === (state.trimStyles?.[key] || "none")) || TRIMS[0];
 function priceInfo() {
-  const details = TRIM_POSITIONS.map((position) => {
+  const details = activeTrimPositions().map((position) => {
     const trim = trimFor(position.key);
     return { ...position, styleId: trim.id, styleName: trim.name, price: trim.price };
   });
   const trim = details.reduce((sum, item) => sum + item.price, 0);
   return { base: CONFIG.basePrice, trim, total: CONFIG.basePrice + trim, details };
 }
-function trimSummaryShort(styles = state.trimStyles) {
-  return TRIM_POSITIONS.map((position) => {
-    const trim = TRIMS.find((item) => item.id === styles?.[position.key]) || TRIMS[0];
+function trimSummaryShort(config = state) {
+  const styles = config.trimStyles || {};
+  return activeTrimPositions(config).map((position) => {
+    const trim = TRIMS.find((item) => item.id === styles[position.key]) || TRIMS[0];
     return trim.name;
   }).join(" / ");
 }
@@ -422,6 +467,13 @@ function applyPreset(style) {
   state.trimStyles = { ...(style.trims || {
     top: style.trim, start: style.trim, hoodTop: style.trim, hoodBottom: style.trim,
   }) };
+  if (style.notch) {
+    state.notchEnabled = true;
+    if (style.notch.shape) state.notchShape = style.notch.shape;
+    if (Number.isFinite(Number(style.notch.width))) state.notchWidth = Number(style.notch.width);
+    if (Number.isFinite(Number(style.notch.height))) state.notchHeight = Number(style.notch.height);
+    if (Number.isFinite(Number(style.notch.offset))) state.notchOffset = Number(style.notch.offset);
+  }
   normalizeState();
   syncUI();
   setCustomizeTab("upper");
@@ -597,7 +649,6 @@ function renderHomeCases() {
       <img class="case-image ${item.fit === "cover" ? "is-cover" : ""}" src="${esc(item.image)}" alt="${esc(item.name)}烟机罩案例" ${index ? 'loading="lazy"' : ""} draggable="false" />
       <div class="case-shade"></div>
       <div class="case-meta">
-        <p class="case-kicker">定制 PVC 烟机罩</p>
         <h2 class="case-name">${esc(item.name)}</h2>
         <p class="case-spec">${esc(style.desc)} · ${esc(style.tone)}色</p>
       </div>
@@ -639,7 +690,7 @@ function renderNotchOptions() {
   const root = $("#notchOptions");
   if (!root) return;
   root.innerHTML = NOTCH_SHAPES.map((shape) =>
-    `<button class="notch-option" type="button" data-notch="${shape.id}">${shape.label}</button>`
+    `<button class="notch-option" type="button" data-notch="${shape.id}">${notchArt(shape.id)}<b>${shape.label}</b></button>`
   ).join("");
 }
 
@@ -666,7 +717,7 @@ function renderStartOptions() {
 function renderTrimList() {
   const list = $("#trimList");
   if (!list) return;
-  list.innerHTML = TRIM_POSITIONS.map((position) => {
+  list.innerHTML = activeTrimPositions().map((position) => {
     const trim = trimFor(position.key);
     return `<button class="trim-row" type="button" data-trim-position="${position.key}">
       <span class="trim-row-icon">${trimArt(trim.id)}</span>
@@ -729,6 +780,9 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   $$("#notchOptions .notch-option").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.notch === state.notchShape);
   });
+  const noSide = state.surfaceType === "none";
+  if ($("#startLabel")) $("#startLabel").hidden = noSide;
+  if ($("#startOptions")) $("#startOptions").hidden = noSide;
   const startOptions = allowedStarts(state.surfaceType);
   const signature = startOptions.map((item) => `${item.id}:${item.label}`).join(",");
   const currentSignature = $$("#startOptions button").map((button) => `${button.dataset.start}:${button.textContent}`).join(",");
@@ -738,6 +792,11 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   $$("#startOptions button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.start === state.surfaceStart);
   });
+  if ($("#startHint")) {
+    const convex = state.surfaceType === "convex";
+    $("#startHint").hidden = !convex;
+    $("#startHint").textContent = convex ? "位置越靠下，向外鼓出的位置越靠近下横。" : "";
+  }
 
   renderTrimList();
 
@@ -853,45 +912,45 @@ function setCustomizeTab(tab) {
 }
 
 /* ---------- 安装 ---------- */
+const STEP_MARKS = ["①", "②", "③", "④", "⑤"];
+const stepMark = (index) => STEP_MARKS[index] || String(index + 1);
+
 const INSTALL_STEPS = {
   base: {
     name: "主体拼接",
-    title: "先围三面，再上正面板",
-    desc: "左右侧板先立，有垫高时垫板贴到内侧面；顶板从上往下压住，最后正面板从前往后盖上。上竖同样先立两侧，再上正面板。",
+    title: "主体按顺序拼装",
+    desc: "有垫高先贴垫板，再装侧板、顶板、正面。",
   },
   curve: {
     name: "曲面装饰",
-    title: "把 3 块曲面装饰压到接缝上",
-    desc: "对准上竖与下横的接缝，从上往下压合，左右对称后再上胶固定。",
+    title: "曲面压到接缝上",
+    desc: "对准上竖与下横的接缝，从上往下压合。",
   },
   trim: {
     name: "装饰条",
-    title: "切出海棠角，再装装饰条",
-    desc: "先用美工刀在两端切出 45° 海棠角；切好后直接贴回罩体，再逐段压紧 30 秒。",
+    title: "切角后再贴装饰条",
+    desc: "两端切 45° 海棠角，贴回罩体压紧 30 秒。",
   },
   paint: {
     name: "刷漆",
     title: "刷成可可蛋奶色",
-    desc: "从基础白薄涂两遍，间隔 30 分钟，阴干 24 小时。",
+    desc: "薄涂两遍，间隔 30 分钟，阴干 24 小时。",
   },
 };
 
-function hasSurfaceCurve() {
-  return state.surfaceType !== "flat";
-}
-
-function hasAnyTrim() {
-  const styles = state.trimStyles || {};
-  return TRIM_POSITIONS.some(({ key }) => (styles[key] || "none") !== "none");
-}
-
-function installStepsFor(config) {
-  const keys = ["base"];
-  if (config.surfaceType !== "flat") keys.push("curve");
-  const styles = config.trimStyles || {};
-  if (TRIM_POSITIONS.some(({ key }) => (styles[key] || "none") !== "none")) keys.push("trim");
-  keys.push("paint");
-  return keys.map((key) => ({ key, ...INSTALL_STEPS[key] }));
+function installStepsFor(config = {}) {
+  const styles = config.trimStyles || {
+    top: config.trimStyle || "none",
+    start: config.trimStyle || "none",
+    hoodTop: config.trimStyle || "none",
+    hoodBottom: config.trimStyle || "none",
+  };
+  const hasCurve = config.surfaceType !== "flat" && config.surfaceType !== "none";
+  const hasTrim = activeTrimPositions(config).some(({ key }) => (styles[key] || "none") !== "none");
+  // 没有对应部件的步骤直接省略，序号按剩余步骤重新排。
+  return ["base", "curve", "trim", "paint"]
+    .filter((key) => (key !== "curve" || hasCurve) && (key !== "trim" || hasTrim))
+    .map((key) => ({ key, ...INSTALL_STEPS[key] }));
 }
 
 function installSteps() {
@@ -904,7 +963,7 @@ function renderInstallTabs() {
   if (nav) {
     nav.innerHTML = steps.map((step, index) => `
       <button role="tab" aria-selected="false" data-key="${step.key}" type="button">
-        <span>${String(index + 1).padStart(2, "0")}</span>${step.name}
+        <span>${stepMark(index)}</span>${step.name}
       </button>
     `).join("");
   }
@@ -1002,16 +1061,18 @@ function renderCheckoutSummary() {
   const style = currentStyle();
   const price = priceInfo();
   const start = startLabelFor(state.surfaceType, state.surfaceStart);
-  const curveLabel = state.surfaceType === "flat"
-    ? `不弯曲 · ${start}`
-    : `${state.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
+  const curveLabel = state.surfaceType === "none"
+    ? "无侧面"
+    : state.surfaceType === "flat"
+      ? `不弯曲 · ${start}`
+      : `${state.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
   summary.innerHTML = [
     sumRow("款式", `${style.name} · ${style.tone}`),
     sumRow("下横", `${state.hoodWidth} × ${state.hoodDepth}mm`),
     sumRow("侧高", `靠墙 ${state.rearHeight} / 前侧 ${state.frontHeight}mm`),
     sumRow("上竖", `${state.chimneyWidth} × ${state.chimneyDepth} × ${state.chimneyHeight}mm`),
-    sumRow("曲面", curveLabel),
-    sumRow("装饰条", trimSummaryShort(state.trimStyles)),
+    sumRow("侧面", curveLabel),
+    sumRow("装饰条", trimSummaryShort(state)),
     sumRow("垫高", `${state.shimHeight}mm`),
     sumRow("主体", fmt(CONFIG.basePrice)),
     sumRow("装饰", fmt(price.trim)),
@@ -1223,10 +1284,15 @@ function openServiceSheet() {
 
 function orderInstallConfig(order) {
   const config = order?.config || {};
+  // 旧订单只有单一 trimStyle，四个位置都按它还原；新订单直接用 trimStyles。
+  const legacyTrim = config.trimStyle;
+  const fallbackTrims = legacyTrim
+    ? { top: legacyTrim, start: legacyTrim, hoodTop: legacyTrim, hoodBottom: legacyTrim }
+    : DEFAULTS.trimStyles;
   return {
     ...DEFAULTS,
     ...config,
-    trimStyles: { ...DEFAULTS.trimStyles, ...(config.trimStyles || {}) },
+    trimStyles: { ...fallbackTrims, ...(config.trimStyles || {}) },
   };
 }
 
@@ -1368,6 +1434,7 @@ function renderPay() {
   }
   if ($("#payAmount")) $("#payAmount").textContent = fmt(pendingOrder.price?.total ?? priceInfo().total);
   if ($("#payOrderNo")) $("#payOrderNo").textContent = pendingOrder.id || "—";
+  if ($("#payWechat")) $("#payWechat").textContent = CONFIG.wechatId || "—";
   setupQr();
 }
 
@@ -1452,9 +1519,11 @@ function orderMessage(order) {
   const customer = order.customer || {};
   const curveType = config.surfaceType || "concave";
   const start = startLabelFor(curveType, config.surfaceStart);
-  const curve = curveType === "flat"
-    ? `不弯曲 · ${start}`
-    : `${curveType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
+  const curve = curveType === "none"
+    ? "无侧面"
+    : curveType === "flat"
+      ? `不弯曲 · ${start}`
+      : `${curveType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
   const trimLines = Array.isArray(order.price?.trimDetails)
     ? order.price.trimDetails.map((item) => `装饰条·${item.name}：${item.styleName}${item.price ? ` ${fmt(item.price)}` : " 免费"}`)
     : [`装饰条：${order.price?.trimName || "无"}`];
@@ -1464,7 +1533,7 @@ function orderMessage(order) {
     `下横：${config.hoodWidth} × ${config.hoodDepth}mm`,
     `侧高：靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`,
     `上竖：${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`,
-    `曲面：${curve}`,
+    `侧面：${curve}`,
     ...trimLines,
     `垫高：${config.shimHeight}mm`,
     `合计：${fmt(order.price?.total || 0)}`,
@@ -1474,10 +1543,15 @@ function orderMessage(order) {
 }
 
 /* ---------- 弹层 / Toast ---------- */
-function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose = null }) {
+function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose = null, sheetClass = "" }) {
   if (sheetOpen) sheetCleanup?.();
   sheetCleanup = onClose;
   lastFocused = document.activeElement;
+  const sheet = $(".sheet");
+  if (sheet) {
+    sheet.classList.remove("sheet--install");
+    if (sheetClass) sheet.classList.add(sheetClass);
+  }
   $("#sheetTitle").textContent = title;
   $("#sheetBody").innerHTML = body;
   const actionsRoot = $("#sheetActions");
@@ -1503,6 +1577,7 @@ function closeSheet() {
   const cleanup = sheetCleanup;
   sheetCleanup = null;
   if (cleanup) cleanup();
+  $(".sheet")?.classList.remove("sheet--install");
   $("#sheetRoot").hidden = true;
   $("#sheetRoot").classList.remove("is-light");
   document.body.classList.remove("sheet-open");
@@ -1519,10 +1594,12 @@ function openInstallGuide(config = state) {
   disposeMiniInstall();
   const steps = installStepsFor(config);
   if (!steps.length) return;
+  let replayCurrent = () => {};
 
   openSheet({
     title: "安装说明",
     backdrop: "light",
+    sheetClass: "sheet--install",
     onClose: disposeMiniInstall,
     body: `
       <div class="mini-install">
@@ -1532,12 +1609,11 @@ function openInstallGuide(config = state) {
           <b id="miniInstallTitle"></b>
           <p id="miniInstallDesc"></p>
         </div>
-        <button class="mini-install-replay" id="miniInstallReplay" type="button">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 9a6 6 0 1 1 1.4 5.4M4 4v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          重新播放
-        </button>
       </div>
     `,
+    actions: [
+      { label: "重新播放", kind: "primary", onClick: () => replayCurrent() },
+    ],
   });
 
   const nav = $("#miniInstallTabs");
@@ -1545,7 +1621,7 @@ function openInstallGuide(config = state) {
   if (!nav || !stage) return;
 
   nav.innerHTML = steps
-    .map((step) => `<button role="tab" aria-selected="false" data-key="${step.key}" type="button">${step.name}</button>`)
+    .map((step, index) => `<button role="tab" aria-selected="false" data-key="${step.key}" type="button"><span class="mini-install-step">${stepMark(index)}</span>${step.name}</button>`)
     .join("");
 
   let currentKey = steps[0].key;
@@ -1560,12 +1636,12 @@ function openInstallGuide(config = state) {
     miniInstallApi?.setStep(info.key, { animate });
   };
 
+  replayCurrent = () => apply(currentKey, true);
   apply(currentKey, false);
   nav.addEventListener("click", (event) => {
     const button = event.target.closest("[data-key]");
     if (button) apply(button.dataset.key, true);
   });
-  $("#miniInstallReplay")?.addEventListener("click", () => apply(currentKey, true));
 
   const token = ++miniInstallToken;
   import("./install3d.js")
@@ -1657,21 +1733,19 @@ function openHelp(kind) {
       </ul><p class="sheet-note">前侧高至少比靠墙侧低 30mm，页面会自动帮你限制。</p>`,
     },
     shim: {
-      title: "垫高是什么？",
-      body: `${art(`<svg viewBox="0 0 320 110">
-        <path d="M40 14v82" stroke="#ddd2c2" stroke-width="1.2" stroke-dasharray="4 4"/>
-        <path d="M58 44h204v8H58z" fill="#f2e2cb" stroke="#c9b79d" stroke-width="1.2"/>
-        <rect x="74" y="52" width="14" height="10" fill="#e6d2b7" stroke="#c9b79d" stroke-width="1"/>
-        <rect x="232" y="52" width="14" height="10" fill="#e6d2b7" stroke="#c9b79d" stroke-width="1"/>
-        <path d="M74 62h172v30H74z" fill="#faf5ec" stroke="#c9b79d" stroke-width="1.2"/>
-        <path d="M286 82V46" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
-        <path d="M280 52l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="286" y="96" font-size="9" fill="#245c45" text-anchor="middle">垫高</text>
-      </svg>`)}<p>如果油烟机顶面偏低、上方空出一截，垫高会把整个装饰罩一起抬高，让外罩和吊柜、墙面更贴合。</p><ul class="sheet-list">
-        <li>5mm 一档，最多 60mm。</li>
-        <li>外罩总高度会跟着一起变，比例不会失调。</li>
-        <li>垫板藏在罩体内部，外观上看不出来。</li>
-      </ul><p class="sheet-note">拿不准要不要垫？把吊柜到油烟机的照片发给客服，我们帮你看。</p>`,
+      title: "垫高",
+      body: `${art(`<svg viewBox="0 0 320 132">
+        <path d="M30 12v108" stroke="#ddd2c2" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <rect x="58" y="14" width="204" height="60" rx="5" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.3"/>
+        <rect x="74" y="74" width="172" height="16" rx="3" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
+        <rect x="70" y="90" width="180" height="30" rx="3" fill="#e7e3db" stroke="#b7b1a6" stroke-width="1.2"/>
+        <text x="160" y="48" text-anchor="middle" font-size="9" fill="#7a6248">装饰罩</text>
+        <text x="160" y="86" text-anchor="middle" font-size="9" font-weight="600" fill="#7a5a35">垫高</text>
+        <text x="160" y="110" text-anchor="middle" font-size="9" fill="#777a72">油烟机</text>
+        <path d="M286 72V44" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M280 50l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="298" y="62" font-size="8" fill="#245c45">抬高</text>
+      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
     },
     install: {
       title: "安装小贴士",
@@ -1936,31 +2010,6 @@ async function init() {
   syncUI({ writeInputs: true });
   renderRoute();
   flushPending();
-
-  const renderId = new URLSearchParams(location.search).get("render");
-  if (renderId) {
-    const style = STYLES.find((item) => item.id === renderId);
-    if (style) {
-      const host = document.createElement("div");
-      host.style.cssText = "position:fixed;left:-9999px;top:0;width:868px;height:496px;background:#fff";
-      document.body.appendChild(host);
-      import("./preview.js").then(({ createPreview }) => {
-        const preset = {
-          ...DEFAULTS,
-          ...style.dims,
-          styleId: style.id,
-          surfaceType: style.curve,
-          surfaceStart: style.start,
-          trimStyles: { ...style.trims },
-          shimHeight: 0,
-        };
-        const dirParam = new URLSearchParams(location.search).get("dir");
-        const dir = dirParam ? dirParam.split(",").map(Number) : null;
-        const api = createPreview(host, preset, dir && dir.length === 3 ? { direction: dir } : {});
-        setTimeout(() => { window.__renderPng = api.snapshot(); }, 900);
-      });
-    }
-  }
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stopCaseAuto();

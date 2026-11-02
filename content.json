@@ -13,49 +13,49 @@
       "styleId": "cloud",
       "name": "云朵弧",
       "image": "assets/styles/cloud.png",
-      "model": "assets/styles/cloud.png",
+      "model": "assets/models/cloud.png",
       "fit": "contain"
     },
     {
       "styleId": "tall",
       "name": "高弧",
       "image": "assets/styles/tall.png",
-      "model": "assets/styles/tall.png",
+      "model": "assets/models/tall.png",
       "fit": "contain"
     },
     {
       "styleId": "line",
       "name": "直边梯形",
       "image": "assets/styles/line.png",
-      "model": "assets/styles/line.png",
+      "model": "assets/models/line.png",
       "fit": "contain"
     },
     {
       "styleId": "arch",
       "name": "微拱门",
       "image": "assets/styles/arch.png",
-      "model": "assets/styles/arch.png",
+      "model": "assets/models/arch.png",
       "fit": "contain"
     },
     {
       "styleId": "retro",
       "name": "海棠边",
       "image": "assets/styles/retro.png",
-      "model": "assets/styles/retro.png",
+      "model": "assets/models/retro.png",
       "fit": "contain"
     },
     {
       "styleId": "float",
       "name": "悬浮边",
       "image": "assets/styles/float.png",
-      "model": "assets/styles/float.png",
+      "model": "assets/models/float.png",
       "fit": "contain"
     },
     {
       "styleId": "crown",
       "name": "方冠",
       "image": "assets/styles/crown.png",
-      "model": "assets/styles/crown.png",
+      "model": "assets/models/crown.png",
       "fit": "contain"
     }
   ]
