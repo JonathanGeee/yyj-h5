@@ -35,7 +35,7 @@ const STYLES = [
     notch: { shape: "trapezoid", width: 340, height: 60, offset: 0 },
   },
   {
-    id: "arch", name: "圆顶拱", tone: "暖米", desc: "圆顶外凸 · 大弧口",
+    id: "arch", name: "圆顶拱", tone: "暖米", desc: "窄身长弧 · 大圆拱口",
     curve: "concave", start: "top",
     dims: { hoodWidth: 840, hoodDepth: 480, rearHeight: 400, frontHeight: 280, chimneyWidth: 300, chimneyDepth: 310, chimneyHeight: 520 },
     trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
