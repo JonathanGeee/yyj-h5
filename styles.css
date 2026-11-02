@@ -865,6 +865,90 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .order-detail-total span { color: var(--muted); font-size: 10px; }
 .order-detail-total b { color: var(--green); font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
 
+/* ---------- 订单模型 / 图纸 ---------- */
+.order-model-card {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(74, 55, 31, 0.05);
+}
+.order-model-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f3f5f1;
+}
+.order-model-tabs button {
+  flex: 1;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 650;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.order-model-tabs button[aria-selected="true"] {
+  color: var(--green);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(74, 55, 31, 0.08);
+}
+.order-model-stage {
+  position: relative;
+  height: 236px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 38%, #fbfaf6 0%, #f2f0ea 78%);
+  touch-action: none;
+}
+.order-model-stage canvas { display: block; width: 100%; height: 100%; }
+.order-model-stage[hidden],
+.order-drawing[hidden] { display: none; }
+.order-model-stage.is-fallback { display: grid; place-items: center; color: var(--muted); font-size: 11px; }
+.order-drawing { margin-top: 10px; padding: 0 2px 2px; }
+.drawing-group + .drawing-group { margin-top: 15px; }
+.drawing-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 7px;
+  color: var(--ink-2);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+.drawing-group h3::before {
+  content: "";
+  width: 3px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--green);
+  opacity: 0.72;
+}
+.drawing-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.drawing-tile {
+  padding: 6px 6px 8px;
+  border: 1px solid #eceee9;
+  border-radius: 12px;
+  background: #fbfaf7;
+  text-align: center;
+}
+.drawing-art { display: grid; place-items: center; height: 62px; }
+.drawing-art svg { display: block; width: 100%; height: 100%; }
+.drawing-tile > b { display: block; margin-top: 3px; color: var(--ink-2); font-size: 9.5px; font-weight: 600; }
+.drawing-tile > span { display: block; margin-top: 1px; color: var(--muted); font-size: 8.5px; font-variant-numeric: tabular-nums; }
+.drawing-tile > em { display: block; margin-top: 1px; color: var(--faint); font-size: 8px; font-style: normal; }
+.drawing-note { margin: 12px 0 2px; color: var(--faint); font-size: 8.5px; text-align: center; }
+.order-model-card + .order-detail-card { margin-top: 14px; }
+
 /* ---------- 安装说明 ---------- */
 .view--install {
   position: relative;
@@ -1044,9 +1128,8 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .sheet.sheet--order .sheet-actions {
   flex: none;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #eceee9;
+  margin-top: 8px;
+  padding-top: 0;
 }
 .sheet.sheet--order .sheet-actions .btn {
   height: 50px;
@@ -1060,7 +1143,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   z-index: 2;
   display: flex;
   gap: 5px;
-  padding: 2px 0 10px;
+  padding: 2px 0 4px;
   background: var(--paper);
 }
 .order-steps button {
@@ -1119,7 +1202,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .sheet.sheet--order #checkoutForm { padding: 0; }
 .sheet.sheet--order .pay-card {
   margin: 0;
-  padding: 16px 16px 14px;
+  padding: 2px 16px 14px;
   border: 0;
   box-shadow: none;
   background: transparent;
@@ -1159,18 +1242,6 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   border-radius: 10px;
 }
 .order-step-empty { margin: 0; padding: 72px 0; color: var(--faint); font-size: 10px; }
-.order-service-note {
-  margin: 12px 0 8px;
-  padding: 12px 14px;
-  border: 1px solid rgba(36, 92, 69, 0.18);
-  border-radius: 14px;
-  background: var(--green-soft);
-  text-align: center;
-}
-.order-service-note b { display: block; color: var(--green); font-size: 10.5px; }
-.order-service-note span { display: block; margin-top: 3px; color: var(--ink); font-size: 14px; font-weight: 650; }
-.order-service-note em { color: var(--green); font-style: normal; }
-.order-service-tip { margin: 8px 0 0; color: var(--muted); font-size: 9.5px; }
 .sum-ship { display: inline-flex; align-items: baseline; gap: 6px; }
 .sum-ship s { color: var(--faint); font-weight: 400; }
 .sum-ship em { color: var(--green); font-style: normal; font-weight: 650; }
@@ -1289,6 +1360,8 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .order-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; padding-top: 10px; border-top: 1px solid #eceee9; }
 .order-total span { color: var(--muted); font-size: 10px; }
 .order-total b { color: var(--green); font-family: var(--serif); font-size: 22px; font-weight: 600; }
+.order-total-prices { display: flex; align-items: baseline; gap: 8px; }
+.order-total-prices s { color: var(--faint); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .form-error { min-height: 16px; margin: 8px 2px 2px; color: var(--danger); font-size: 10.5px; }
 
 .flow-footer {

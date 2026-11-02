@@ -2,51 +2,51 @@
   "wechatId": "Jonathan_Ge",
   "qrImage": "assets/pay-qr.jpg",
   "serviceQrImage": "assets/service-qr.jpg",
-  "basePrice": 700,
+  "basePrice": 480,
   "trimPrices": {
     "none": 0,
-    "single": 30,
-    "corner": 40
+    "single": 35,
+    "corner": 45
   },
   "cases": [
     {
       "styleId": "cloud",
-      "name": "云朵弧",
+      "name": "法式云朵弧",
       "image": "assets/styles/cloud.png",
       "model": "assets/models/cloud.png",
       "fit": "contain"
     },
     {
       "styleId": "tall",
-      "name": "高窄弧",
+      "name": "法式高窄弧",
       "image": "assets/styles/tall.png",
       "model": "assets/models/tall.png",
       "fit": "contain"
     },
     {
       "styleId": "line",
-      "name": "直边塔",
+      "name": "法式直边塔",
       "image": "assets/styles/line.png",
       "model": "assets/models/line.png",
       "fit": "contain"
     },
     {
       "styleId": "arch",
-      "name": "圆顶拱",
+      "name": "法式圆顶拱",
       "image": "assets/styles/arch.png",
       "model": "assets/models/arch.png",
       "fit": "contain"
     },
     {
       "styleId": "crown",
-      "name": "宽方冠",
+      "name": "法式宽方冠",
       "image": "assets/styles/crown.png",
       "model": "assets/models/crown.png",
       "fit": "contain"
     },
     {
       "styleId": "float",
-      "name": "极简方盒",
+      "name": "法式极简方盒",
       "image": "assets/styles/float.png",
       "model": "assets/models/float.png",
       "fit": "contain"

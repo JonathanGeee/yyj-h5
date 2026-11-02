@@ -2,8 +2,8 @@
  * 所有价格、微信号、收款码和后台地址都集中在 CONFIG，改这里即可。
  */
 const CONFIG = {
-  basePrice: 700,
-  trimPrices: { none: 0, single: 30, corner: 40 },
+  basePrice: 480,
+  trimPrices: { none: 0, single: 35, corner: 45 },
   wechatId: "Jonathan_Ge",
   qrImage: "assets/pay-qr.jpg",
   serviceQrImage: "assets/service-qr.jpg",
@@ -60,12 +60,12 @@ const STYLES = [
 // 首页案例：大图先用原来的 3D 渲染占位，之后换成 AI 实景图。
 // model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
 const HOME_CASES = [
-  { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.png", model: "assets/models/cloud.png", fit: "contain" },
-  { styleId: "tall", name: "高窄弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
-  { styleId: "line", name: "直边塔", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
-  { styleId: "arch", name: "圆顶拱", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
-  { styleId: "crown", name: "宽方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
-  { styleId: "float", name: "极简方盒", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
+  { styleId: "cloud", name: "法式云朵弧", image: "assets/styles/cloud.png", model: "assets/models/cloud.png", fit: "contain" },
+  { styleId: "tall", name: "法式高窄弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
+  { styleId: "line", name: "法式直边塔", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
+  { styleId: "arch", name: "法式圆顶拱", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
+  { styleId: "crown", name: "法式宽方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
+  { styleId: "float", name: "法式极简方盒", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
 ];
 // 3D 小图的全局兜底；每个案例自己的 model 优先。
 let HOME_3D_IMAGE = "";
@@ -109,8 +109,8 @@ async function loadSiteContent() {
 
 const TRIMS = [
   { id: "none", name: "无装饰条", desc: "干净利落", price: 0 },
-  { id: "single", name: "半圆线条", desc: "半圆细边", price: 30 },
-  { id: "corner", name: "顶角条", desc: "直角收边", price: 40 },
+  { id: "single", name: "半圆线条", desc: "半圆细边", price: 35 },
+  { id: "corner", name: "顶角条", desc: "直角收边", price: 45 },
 ];
 
 const TRIM_POSITIONS = [
@@ -444,6 +444,8 @@ function priceInfo() {
   const trim = details.reduce((sum, item) => sum + item.price, 0);
   return { base: CONFIG.basePrice, trim, total: CONFIG.basePrice + trim, details };
 }
+// 下单页展示的划线价：总价的 140%。
+const listPrice = (total) => Math.round(Number(total) * 1.4);
 function trimSummaryShort(config = state) {
   const styles = config.trimStyles || {};
   return activeTrimPositions(config).map((position) => {
@@ -1104,6 +1106,7 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   if ($("#installPrice")) $("#installPrice").textContent = fmt(price.total);
   if ($("#installPriceBtn")) $("#installPriceBtn").textContent = fmt(price.total);
   if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
+  if ($("#checkoutOriginalPrice")) $("#checkoutOriginalPrice").textContent = fmt(listPrice(price.total));
 
   schedulePreview();
 }
@@ -1174,6 +1177,8 @@ function renderRoute() {
   }
   if (route === "order") {
     renderOrderDetail();
+  } else {
+    disposeOrderPreview();
   }
   if (route === "customize") {
     ensurePreview();
@@ -1369,6 +1374,7 @@ function renderCheckout() {
   renderCheckoutSummary();
   const price = priceInfo();
   if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
+  if ($("#checkoutOriginalPrice")) $("#checkoutOriginalPrice").textContent = fmt(listPrice(price.total));
   const saved = readStored(STORAGE.customer, null);
   if (saved) {
     const fields = { coName: "name", coPhone: "phone", coRegion: "region", coAddress: "address" };
@@ -1395,6 +1401,8 @@ function getCustomer() {
 let orderSearchToken = 0;
 let orderResultsCache = [];
 let activeOrder = null;
+let orderPreviewApi = null;
+let orderPreviewToken = 0;
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 11);
@@ -1515,6 +1523,175 @@ function renderOrdersPage() {
   }
 }
 
+function orderDetailNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function orderDrawingSvg(part) {
+  const w = Math.max(1, part.w || 1);
+  const h = Math.max(1, part.h || 1);
+  const maxW = 132;
+  const maxH = 58;
+  const scale = Math.min(maxW / w, maxH / h);
+  const sw = Math.max(10, w * scale);
+  const sh = Math.max(10, h * scale);
+  const x = (160 - sw) / 2;
+  const y = 12 + (maxH - sh) / 2;
+  const stroke = "#245c45";
+  const fill = "rgba(36, 92, 69, 0.08)";
+  let d = "";
+
+  if (part.kind === "side") {
+    const backH = Math.max(part.backH || h, part.frontH || h);
+    const frontH = Math.min(part.backH || h, part.frontH || h);
+    const drop = Math.min(sh * 0.45, Math.max(0, (backH - frontH) * scale));
+    d = `M${x} ${y} L${x + sw} ${y + drop} L${x + sw} ${y + sh} L${x} ${y + sh} Z`;
+  } else if (part.kind === "curve") {
+    const bend = Math.min(10, sh * 0.2) * (part.surface === "convex" ? -1 : 1);
+    d = `M${x} ${y} Q${x + sw / 2} ${y + bend} ${x + sw} ${y} L${x + sw} ${y + sh} Q${x + sw / 2} ${y + sh - bend * 0.5} ${x} ${y + sh} Z`;
+  } else if (part.kind === "notch") {
+    const rawWidth = (part.notchWidth || 0) * scale;
+    const rawHeight = (part.notchHeight || 0) * scale;
+    const notchW = Math.min(sw * 0.78, Math.max(sw * 0.1, rawWidth));
+    const notchH = Math.min(sh * 0.62, Math.max(2, rawHeight));
+    const center = x + sw / 2 + (part.notchOffset || 0) * scale;
+    const left = Math.max(x + 4, Math.min(x + sw - 4, center - notchW / 2));
+    const right = Math.max(x + 4, Math.min(x + sw - 4, center + notchW / 2));
+    const top = y + sh - notchH;
+    if (part.notchShape === "trapezoid") {
+      const inset = Math.min(notchW * 0.18, notchH * 0.55);
+      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} L${right - inset} ${top} H${left + inset} L${left} ${y + sh} H${x} Z`;
+    } else if (part.notchShape === "arch" || part.notchShape === "rounded") {
+      const shoulder = y + sh - notchH * 0.42;
+      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} V${shoulder} Q${right} ${top} ${center} ${top} Q${left} ${top} ${left} ${shoulder} V${y + sh} H${x} Z`;
+    } else {
+      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} V${top} H${left} V${y + sh} H${x} Z`;
+    }
+  } else {
+    d = `M${x} ${y} H${x + sw} V${y + sh} H${x} Z`;
+  }
+
+  const centerLine = part.kind === "notch" || part.kind === "curve" || part.kind === "side"
+    ? `<path d="M${x + sw / 2} ${y + 2} V${y + sh - 2}" stroke="${stroke}" stroke-width=".6" stroke-dasharray="2 3" opacity=".24"/>`
+    : "";
+  return `<svg viewBox="0 0 160 96" aria-hidden="true">
+    <path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="1.2" stroke-linejoin="round"/>
+    ${centerLine}
+  </svg>`;
+}
+
+function orderDrawingTile(part) {
+  return `<article class="drawing-tile">
+    <div class="drawing-art">${orderDrawingSvg(part)}</div>
+    <b>${esc(part.name)}</b>
+    <span>${esc(part.size)}</span>
+    ${part.note ? `<em>${esc(part.note)}</em>` : ""}
+  </article>`;
+}
+
+function orderDrawingGroup(title, parts) {
+  if (!parts.length) return "";
+  const sorted = parts.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h) || b.w - a.w);
+  return `<section class="drawing-group">
+    <h3>${esc(title)}</h3>
+    <div class="drawing-row">${sorted.map(orderDrawingTile).join("")}</div>
+  </section>`;
+}
+
+function buildOrderDrawings(config) {
+  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
+  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
+  const rearHeight = orderDetailNumber(config.rearHeight, 380);
+  const frontHeight = orderDetailNumber(config.frontHeight, 240);
+  const chimneyWidth = orderDetailNumber(config.chimneyWidth, 320);
+  const chimneyDepth = orderDetailNumber(config.chimneyDepth, 280);
+  const chimneyHeight = orderDetailNumber(config.chimneyHeight, 500);
+  const shimHeight = orderDetailNumber(config.shimHeight, 0);
+  const notchEnabled = config.notchEnabled !== false;
+  const notchWidth = orderDetailNumber(config.notchWidth, 420);
+  const notchHeight = orderDetailNumber(config.notchHeight, 80);
+  const notchOffset = orderDetailNumber(config.notchOffset, 0);
+  const notchShape = config.notchShape || "arch";
+
+  const lower = [
+    { name: "下横顶板", w: hoodWidth, h: hoodDepth, kind: "rect", size: `${hoodWidth} × ${hoodDepth}mm` },
+    {
+      name: "下横前挡板", w: hoodWidth, h: frontHeight, kind: notchEnabled ? "notch" : "rect",
+      notchWidth, notchHeight, notchOffset, notchShape,
+      size: `${hoodWidth} × ${frontHeight}mm`,
+      note: notchEnabled ? `开口 ${notchWidth} × ${notchHeight}mm` : "",
+    },
+    {
+      name: "下横左侧板", w: hoodDepth, h: rearHeight, backH: rearHeight, frontH: frontHeight, kind: "side",
+      size: `${hoodDepth} × ${rearHeight}mm`, note: `前侧 ${frontHeight}mm`,
+    },
+    {
+      name: "下横右侧板", w: hoodDepth, h: rearHeight, backH: rearHeight, frontH: frontHeight, kind: "side",
+      size: `${hoodDepth} × ${rearHeight}mm`, note: `前侧 ${frontHeight}mm`,
+    },
+  ];
+  const upper = [
+    { name: "上竖前挡板", w: chimneyWidth, h: chimneyHeight, kind: "rect", size: `${chimneyWidth} × ${chimneyHeight}mm` },
+    { name: "上竖左侧板", w: chimneyDepth, h: chimneyHeight, kind: "rect", size: `${chimneyDepth} × ${chimneyHeight}mm` },
+    { name: "上竖右侧板", w: chimneyDepth, h: chimneyHeight, kind: "rect", size: `${chimneyDepth} × ${chimneyHeight}mm` },
+  ];
+
+  const surfaceType = config.surfaceType || "concave";
+  const surfaceStart = config.surfaceStart || "middle";
+  let transition = [];
+  if (surfaceType !== "none") {
+    const fraction = surfaceType === "convex"
+      ? (surfaceStart === "lowest" ? 0.28 : 0.4)
+      : (surfaceStart === "top" ? 1 : 0.5);
+    const transitionHeight = Math.max(60, Math.round(chimneyHeight * fraction));
+    const kind = surfaceType === "flat" ? "rect" : "curve";
+    transition = [
+      { name: surfaceType === "flat" ? "过渡前片" : "曲面前片", w: hoodWidth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodWidth} × ${transitionHeight}mm`, note: "展开示意" },
+      { name: surfaceType === "flat" ? "过渡左片" : "曲面左片", w: hoodDepth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodDepth} × ${transitionHeight}mm`, note: "展开示意" },
+      { name: surfaceType === "flat" ? "过渡右片" : "曲面右片", w: hoodDepth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodDepth} × ${transitionHeight}mm`, note: "展开示意" },
+    ];
+  }
+
+  const shims = shimHeight > 0
+    ? [{ name: "垫板", w: hoodWidth, h: hoodDepth, kind: "rect", size: `${hoodWidth} × ${hoodDepth}mm`, note: `厚 ${shimHeight}mm` }]
+    : [];
+
+  const groups = [
+    orderDrawingGroup("下横", lower),
+    orderDrawingGroup("上竖", upper),
+    orderDrawingGroup(surfaceType === "flat" ? "过渡面" : "曲面", transition),
+    orderDrawingGroup("垫高", shims),
+  ].filter(Boolean);
+  return `${groups.join("")}<p class="drawing-note">展开图为示意，实际下料以工厂图纸为准。</p>`;
+}
+
+function disposeOrderPreview() {
+  orderPreviewToken++;
+  orderPreviewApi?.dispose();
+  orderPreviewApi = null;
+}
+
+async function mountOrderPreview(config) {
+  const stage = $("#orderModelStage");
+  if (!stage) return;
+  const token = ++orderPreviewToken;
+  try {
+    const module = await import("./preview.js");
+    if (token !== orderPreviewToken || !stage.isConnected || currentRoute() !== "order") return;
+    stage.innerHTML = "";
+    orderPreviewApi = module.createPreview(stage, config, {
+      aspectFit: true,
+      fitMargin: 1.35,
+      softLighting: true,
+    });
+  } catch (error) {
+    console.warn("订单 3D 模型加载失败", error);
+    stage.classList.add("is-fallback");
+    stage.textContent = "3D 模型加载失败";
+  }
+}
+
 function renderOrderDetail() {
   const root = $("#orderDetail");
   if (!root) return;
@@ -1534,7 +1711,16 @@ function renderOrderDetail() {
     config.chimneyWidth ? ["上竖", `${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`] : null,
   ].filter(Boolean);
 
+  disposeOrderPreview();
   root.innerHTML = `
+    <section class="order-model-card">
+      <div class="order-model-tabs" id="orderModelTabs" role="tablist" aria-label="订单预览">
+        <button type="button" role="tab" data-order-tab="model" aria-selected="true">3D 模型</button>
+        <button type="button" role="tab" data-order-tab="drawing" aria-selected="false">展开图纸</button>
+      </div>
+      <div class="order-model-stage" id="orderModelStage" role="tabpanel" aria-label="3D 模型"></div>
+      <div class="order-drawing" id="orderDrawing" role="tabpanel" aria-label="展开图纸" hidden>${buildOrderDrawings(config)}</div>
+    </section>
     <section class="order-detail-card">
       <div class="order-detail-head">
         <b>${esc(order.id || "—")}</b>
@@ -1549,6 +1735,25 @@ function renderOrderDetail() {
       <p class="order-detail-wechat">微信号 <b>${esc(CONFIG.wechatId)}</b></p>
     </section>
   `;
+
+  $("#orderModelTabs")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-order-tab]");
+    if (!button) return;
+    setOrderPreviewTab(button.dataset.orderTab);
+  });
+
+  mountOrderPreview(orderInstallConfig(order));
+}
+
+function setOrderPreviewTab(tab) {
+  const isDrawing = tab === "drawing";
+  $$("#orderModelTabs button").forEach((button) => {
+    button.setAttribute("aria-selected", String(button.dataset.orderTab === tab));
+  });
+  const stage = $("#orderModelStage");
+  const drawing = $("#orderDrawing");
+  if (stage) stage.hidden = isDrawing;
+  if (drawing) drawing.hidden = !isDrawing;
 }
 
 function openServiceSheet() {
@@ -1725,7 +1930,13 @@ function orderCheckoutHtml() {
       <div class="order-card">
         <div class="order-card-head"><h2>定制清单</h2><button type="button" id="editConfig" class="link-btn">修改</button></div>
         <div id="orderSummary"></div>
-        <div class="order-total"><span>合计</span><b id="checkoutPrice">${fmt(priceInfo().total)}</b></div>
+        <div class="order-total">
+          <span>合计</span>
+          <div class="order-total-prices">
+            <s id="checkoutOriginalPrice">${fmt(listPrice(priceInfo().total))}</s>
+            <b id="checkoutPrice">${fmt(priceInfo().total)}</b>
+          </div>
+        </div>
       </div>
 
       <p class="form-error" id="formError" role="alert"></p>
@@ -1749,17 +1960,12 @@ function orderServiceHtml() {
   const serviceQr = CONFIG.serviceQrImage || CONFIG.qrImage || "";
   return `
     <div class="order-step-service">
-      <p class="order-step-kicker">添加客服设计师🎨</p>
+      <p class="order-step-kicker">添加客服设计师🎨并发送手机号</p>
       <div class="service-qr order-step-qr">
         ${serviceQr ? `<img id="orderServiceQr" src="${esc(serviceQr)}" alt="客服微信二维码" />` : ""}
         <p class="order-step-empty" id="orderServiceQrFallback" ${serviceQr ? "hidden" : ""}>客服二维码待配置</p>
       </div>
       <div class="copy-row"><span>客服微信</span><b>${esc(CONFIG.wechatId)}</b><button type="button" data-copy-value="${esc(CONFIG.wechatId)}">复制</button></div>
-      <div class="order-service-note">
-        <b>添加后请务必发送</b>
-        <span>下单手机号</span>
-      </div>
-      <p class="order-service-tip">客服核对手机号后安排制作和发货。</p>
     </div>`;
 }
 
