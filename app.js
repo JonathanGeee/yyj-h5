@@ -670,7 +670,7 @@ function setCaseModel(index, { immediate = false } = {}) {
     }
     caseModel.button?.classList.remove("is-flipping");
     caseModel.button?.setAttribute("aria-label", `查看${HOME_CASES[normalized].name}的 3D 模型`);
-    caseThumbApi.spinToState(casePreviewState(normalized), { direction, duration: 760 });
+    caseThumbApi.spinToState(casePreviewState(normalized), { direction, duration: 900 });
     return;
   }
 
@@ -1769,7 +1769,7 @@ function orderServiceHtml() {
       <div class="copy-row"><span>客服微信</span><b>${esc(CONFIG.wechatId)}</b><button type="button" data-copy-value="${esc(CONFIG.wechatId)}">复制</button></div>
       <div class="order-service-note">
         <b>添加后请务必发送</b>
-        <span>支付截图 <em>+</em> 手机号</span>
+        <span>下单手机号</span>
       </div>
       <p class="order-service-tip">客服核对手机号后安排制作和发货。</p>
     </div>`;
@@ -1779,9 +1779,9 @@ function orderSheetHtml() {
   return `
     <div class="order-flow">
       <nav class="order-steps" id="orderSteps" role="tablist" aria-label="下单步骤">
-        <button type="button" role="tab" aria-selected="true" data-order-step="0">填写订单</button>
-        <button type="button" role="tab" aria-selected="false" data-order-step="1">扫码支付</button>
-        <button type="button" role="tab" aria-selected="false" data-order-step="2">添加客服</button>
+        <button type="button" role="tab" aria-selected="true" data-order-step="0"><span class="order-step-no" aria-hidden="true">1</span>填写订单</button>
+        <button type="button" role="tab" aria-selected="false" data-order-step="1"><span class="order-step-no" aria-hidden="true">2</span>扫码支付</button>
+        <button type="button" role="tab" aria-selected="false" data-order-step="2"><span class="order-step-no" aria-hidden="true">3</span>添加客服</button>
       </nav>
       <section class="order-step" data-order-panel="0" role="tabpanel">${orderCheckoutHtml()}</section>
       <section class="order-step" data-order-panel="1" role="tabpanel" hidden>${orderPayHtml()}</section>

@@ -39,8 +39,9 @@ export function createPreview(container, initialState, options = {}) {
   let restoreFadeTimer = 0;
   let spinRaf = 0;
   let spinToken = 0;
-  let spinTargetState = null;
   let spinFallbackTimer = 0;
+  let thumbGhost = null;
+  let thumbTransition = null;
   const flashItems = [];
   const dimMaterials = new Map();
 
@@ -1061,30 +1062,129 @@ export function createPreview(container, initialState, options = {}) {
     renderer.render(scene, camera);
   }
 
-  function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  function smoothstep(t) {
+    const v = Math.min(1, Math.max(0, t));
+    return v * v * (3 - 2 * v);
   }
 
-  // 首页缩略图专用：绕模型中心转半圈，在侧面瞬间换模型，再转回正面。
+  function cloneGhostMaterials(group) {
+    const cache = new Map();
+    const entries = [];
+    const cloneOne = (material) => {
+      if (!material) return material;
+      if (cache.has(material)) return cache.get(material);
+      const clone = material.clone();
+      const baseOpacity = Number.isFinite(material.opacity) ? material.opacity : 1;
+      clone.transparent = true;
+      clone.opacity = baseOpacity;
+      clone.depthWrite = false;
+      clone.needsUpdate = true;
+      cache.set(material, clone);
+      entries.push({ material: clone, baseOpacity });
+      return clone;
+    };
+    group.traverse((object) => {
+      if (!object.material) return;
+      object.material = Array.isArray(object.material)
+        ? object.material.map(cloneOne)
+        : cloneOne(object.material);
+      object.renderOrder = 2;
+    });
+    return entries;
+  }
+
+  function setGhostOpacity(value) {
+    if (!thumbGhost) return;
+    const opacity = Math.min(1, Math.max(0, value));
+    for (const entry of thumbGhost.materials) {
+      entry.material.opacity = entry.baseOpacity * opacity;
+    }
+  }
+
+  function disposeGhost() {
+    if (!thumbGhost) return;
+    const { group, materials } = thumbGhost;
+    thumbGhost = null;
+    scene.remove(group);
+    group.traverse((object) => {
+      object.geometry?.dispose?.();
+    });
+    for (const entry of materials) entry.material.dispose?.();
+  }
+
+  function beginMainFade() {
+    for (const material of [shellMat, transitionMat, trimMat]) {
+      material.transparent = true;
+      material.opacity = 0;
+      material.depthWrite = false;
+      material.needsUpdate = true;
+    }
+    edgeMat.transparent = true;
+    edgeMat.opacity = 0;
+    edgeMat.needsUpdate = true;
+  }
+
+  function setMainFade(value) {
+    const opacity = Math.min(1, Math.max(0, value));
+    shellMat.opacity = opacity;
+    transitionMat.opacity = opacity;
+    trimMat.opacity = opacity;
+    edgeMat.opacity = 0.58 * opacity;
+  }
+
+  function endMainFade() {
+    for (const material of [shellMat, transitionMat, trimMat]) {
+      material.transparent = false;
+      material.opacity = 1;
+      material.depthWrite = true;
+      material.needsUpdate = true;
+    }
+    edgeMat.transparent = true;
+    edgeMat.opacity = 0.58;
+    edgeMat.needsUpdate = true;
+  }
+
+  function completeThumbTransition(transition = thumbTransition) {
+    if (!transition || thumbTransition !== transition) return;
+    if (spinRaf) cancelAnimationFrame(spinRaf);
+    spinRaf = 0;
+    clearTimeout(spinFallbackTimer);
+    spinFallbackTimer = 0;
+    thumbTransition = null;
+    setMainFade(1);
+    endMainFade();
+    disposeGhost();
+    fitDistance = transition.newFit;
+    controls.target.copy(transition.newCenter);
+    const finalTheta = transition.startTheta + transition.direction * Math.PI * 2;
+    const finalRadius = Math.cos(transition.startElevation) * transition.newFit;
+    const finalY = Math.sin(transition.startElevation) * transition.newFit;
+    camera.position.set(
+      transition.newCenter.x + Math.sin(finalTheta) * finalRadius,
+      transition.newCenter.y + finalY,
+      transition.newCenter.z + Math.cos(finalTheta) * finalRadius
+    );
+    camera.lookAt(transition.newCenter);
+    camera.near = Math.max(1, fitDistance / 100);
+    camera.far = fitDistance * 100;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+  }
+
+  // 首页缩略图专用：旧模型淡出、新模型淡入，同时相机绕模型转一整圈。
   function spinToState(nextState, spinOptions = {}) {
     if (!thumbnail) {
       update(nextState);
       return;
     }
     const direction = spinOptions.direction === -1 ? -1 : 1;
-    const duration = Math.max(0, Number(spinOptions.duration) || 620);
-    spinToken++;
-    const token = spinToken;
+    const duration = Math.max(0, Number(spinOptions.duration) || 900);
+
+    if (thumbTransition) completeThumbTransition(thumbTransition);
     if (spinRaf) cancelAnimationFrame(spinRaf);
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
     spinFallbackTimer = 0;
-
-    if (spinTargetState) {
-      update(spinTargetState);
-      resetView();
-      spinTargetState = null;
-    }
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion || duration <= 0) {
@@ -1093,77 +1193,84 @@ export function createPreview(container, initialState, options = {}) {
       return;
     }
 
-    spinTargetState = nextState;
-    const baseTarget = controls.target.clone();
-    const baseOffset = camera.position.clone().sub(baseTarget);
-    const baseRadius = Math.hypot(baseOffset.x, baseOffset.z);
-    const baseY = baseOffset.y;
-    const baseTheta = Math.atan2(baseOffset.x, baseOffset.z);
-    const half = duration / 2;
+    const oldGroup = model;
+    if (!oldGroup) {
+      update(nextState);
+      return;
+    }
+    const startTarget = controls.target.clone();
+    const startOffset = camera.position.clone().sub(startTarget);
+    const startDist = Math.max(1, startOffset.length());
+    const startTheta = Math.atan2(startOffset.x, startOffset.z);
+    const startElevation = Math.asin(Math.min(1, Math.max(-1, startOffset.y / startDist)));
 
-    const drawAt = (theta, target, radius, yOffset) => {
+    thumbGhost = { group: oldGroup, materials: cloneGhostMaterials(oldGroup) };
+    setGhostOpacity(1);
+
+    const newGroup = new THREE.Group();
+    scene.add(newGroup);
+    model = newGroup;
+    state = { ...nextState };
+    buildModel();
+
+    const box = new THREE.Box3().setFromObject(newGroup);
+    const newCenter = box.isEmpty()
+      ? startTarget.clone()
+      : box.getCenter(new THREE.Vector3()).add(targetOffset);
+    const newFit = box.isEmpty() ? startDist : distanceFor(box);
+    beginMainFade();
+
+    const token = ++spinToken;
+    const transition = {
+      newCenter,
+      newFit,
+      startTarget,
+      startDist,
+      startTheta,
+      startElevation,
+      direction,
+      duration,
+    };
+    thumbTransition = transition;
+    const started = performance.now();
+
+    const frame = (now) => {
+      if (token !== spinToken || thumbTransition !== transition) return;
+      const t = Math.min(1, (now - started) / duration);
+      const eased = t;
+      const target = startTarget.clone().lerp(newCenter, eased);
+      const distance = startDist + (newFit - startDist) * eased;
+      const theta = startTheta + direction * Math.PI * 2 * eased;
+      const radius = Math.cos(startElevation) * distance;
+      const yOffset = Math.sin(startElevation) * distance;
       camera.position.set(
         target.x + Math.sin(theta) * radius,
         target.y + yOffset,
         target.z + Math.cos(theta) * radius
       );
       camera.lookAt(target);
+      controls.target.copy(target);
+      camera.near = Math.max(1, distance / 100);
+      camera.far = distance * 100;
+      camera.updateProjectionMatrix();
+
+      const fade = smoothstep((t - 0.3) / 0.4);
+      setMainFade(fade);
+      setGhostOpacity(1 - fade);
       renderer.render(scene, camera);
-    };
 
-    spinFallbackTimer = window.setTimeout(() => {
-      if (token !== spinToken) return;
-      spinToken++;
-      if (spinRaf) cancelAnimationFrame(spinRaf);
-      spinRaf = 0;
-      spinFallbackTimer = 0;
-      update(nextState);
-      resetView();
-      spinTargetState = null;
-    }, duration + 120);
-
-    const started = performance.now();
-    const phaseOne = (now) => {
-      if (token !== spinToken) return;
-      const t = Math.min(1, (now - started) / half);
-      drawAt(baseTheta + direction * Math.PI * easeInOutCubic(t), baseTarget, baseRadius, baseY);
       if (t < 1) {
-        spinRaf = requestAnimationFrame(phaseOne);
+        spinRaf = requestAnimationFrame(frame);
         return;
       }
-
-      // 转到背面时换模型：各款背面都是接近平面的墙侧，切换最不显眼。
-      update(nextState);
-      const target = controls.target.clone();
-      const offset = camera.position.clone().sub(target);
-      const radius = Math.hypot(offset.x, offset.z);
-      const yOffset = offset.y;
-      const backTheta = Math.atan2(offset.x, offset.z);
-      drawAt(backTheta, target, radius, yOffset);
-      const startedTwo = performance.now();
-
-      const phaseTwo = (nowTwo) => {
-        if (token !== spinToken) return;
-        const t2 = Math.min(1, (nowTwo - startedTwo) / half);
-        drawAt(
-          backTheta + direction * Math.PI * easeInOutCubic(t2),
-          target,
-          radius,
-          yOffset
-        );
-        if (t2 < 1) {
-          spinRaf = requestAnimationFrame(phaseTwo);
-          return;
-        }
-        drawAt(baseTheta + direction * Math.PI * 2, target, radius, yOffset);
-        spinRaf = 0;
-        spinTargetState = null;
-        clearTimeout(spinFallbackTimer);
-        spinFallbackTimer = 0;
-      };
-      spinRaf = requestAnimationFrame(phaseTwo);
+      spinRaf = 0;
+      completeThumbTransition(transition);
     };
-    spinRaf = requestAnimationFrame(phaseOne);
+
+    spinRaf = requestAnimationFrame(frame);
+    spinFallbackTimer = window.setTimeout(() => {
+      completeThumbTransition(transition);
+    }, duration + 120);
   }
 
   // 供安装页等外部调用：平滑移动相机 / 回到总览
@@ -1268,6 +1375,8 @@ export function createPreview(container, initialState, options = {}) {
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
     spinFallbackTimer = 0;
+    thumbTransition = null;
+    disposeGhost();
     clearFocus();
     restoreHighlight();
     observer?.disconnect();

@@ -1063,6 +1063,10 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .order-steps button {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   height: 38px;
   padding: 0 2px;
   border: 1.5px solid var(--line);
@@ -1074,6 +1078,25 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   white-space: nowrap;
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.order-step-no {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.72;
+}
+.order-steps button[aria-selected="true"] .order-step-no {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
+.order-steps button.is-locked .order-step-no { opacity: 0.5; }
 .order-steps button[aria-selected="true"] {
   border-color: var(--green);
   color: #fff;
