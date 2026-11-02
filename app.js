@@ -60,12 +60,12 @@ const STYLES = [
 // 首页案例：大图先用原来的 3D 渲染占位，之后换成 AI 实景图。
 // model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
 const HOME_CASES = [
-  { styleId: "cloud", name: "法式云朵弧", image: "assets/styles/cloud.jpg", model: "assets/models/cloud.png", fit: "cover" },
-  { styleId: "line", name: "法式直边塔", image: "assets/styles/line.jpg", model: "assets/models/line.png", fit: "cover" },
-  { styleId: "tall", name: "法式高窄弧", image: "assets/styles/tall.jpg", model: "assets/models/tall.png", fit: "cover" },
-  { styleId: "arch", name: "法式圆顶拱", image: "assets/styles/arch.jpg", model: "assets/models/arch.png", fit: "cover" },
-  { styleId: "crown", name: "法式宽方冠", image: "assets/styles/crown.jpg", model: "assets/models/crown.png", fit: "cover" },
-  { styleId: "float", name: "法式极简方盒", image: "assets/styles/float.jpg", model: "assets/models/float.png", fit: "cover" },
+  { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.jpg", model: "assets/models/cloud.png", fit: "cover" },
+  { styleId: "line", name: "直边塔", image: "assets/styles/line.jpg", model: "assets/models/line.png", fit: "cover" },
+  { styleId: "tall", name: "高窄弧", image: "assets/styles/tall.jpg", model: "assets/models/tall.png", fit: "cover" },
+  { styleId: "arch", name: "圆顶拱", image: "assets/styles/arch.jpg", model: "assets/models/arch.png", fit: "cover" },
+  { styleId: "crown", name: "宽方冠", image: "assets/styles/crown.jpg", model: "assets/models/crown.png", fit: "cover" },
+  { styleId: "float", name: "极简方盒", image: "assets/styles/float.jpg", model: "assets/models/float.png", fit: "cover" },
 ];
 // 3D 小图的全局兜底；每个案例自己的 model 优先。
 let HOME_3D_IMAGE = "";
