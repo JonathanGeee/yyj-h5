@@ -501,10 +501,12 @@ h2 {
 .dim-label span { display: block; margin-top: 2px; color: var(--faint); font-size: 8.5px; }
 .stepper { display: flex; align-items: center; flex: none; height: 38px; padding: 0 4px; border: 1px solid #ece4d8; border-radius: 12px; background: #f3f5f1; }
 .stepper button {
+  flex: none;
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
+  padding: 0;
   border: 0;
   border-radius: 8px;
   color: var(--green);
@@ -513,6 +515,7 @@ h2 {
   font-size: 17px;
   line-height: 1;
 }
+.stepper button svg { display: block; width: 14px; height: 14px; }
 .stepper button:active { background: var(--green-soft); }
 .stepper input {
   width: 48px;
@@ -595,10 +598,8 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .notch-option svg { width: 100%; height: 35px; flex: none; }
 .notch-option b { margin-top: 3px; font-size: 10.5px; font-weight: 600; }
 .notch-option.is-active {
-  border-color: var(--green);
   color: var(--green);
   background: var(--green-soft);
-  box-shadow: 0 0 0 3px rgba(36, 92, 69, 0.07);
 }
 .notch-option.is-active b { color: var(--green); }
 
@@ -618,7 +619,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .curve-option svg { width: 100%; height: 35px; flex: none; margin: 0 auto; }
 .curve-option b { display: block; margin-top: 3px; font-size: 10.5px; font-weight: 600; }
-.curve-option.is-active { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 3px rgba(36, 92, 69, 0.07); }
+.curve-option.is-active { background: var(--green-soft); }
 .curve-option.is-active b { color: var(--green); }
 
 .segmented { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #f3f5f1; }

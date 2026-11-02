@@ -973,10 +973,10 @@ function dimRow(key) {
   return `<div class="dim-row" data-dim="${key}">
     <div class="dim-label"><b>${dim.label}</b>${dim.hint ? `<span>${dim.hint}</span>` : ""}</div>
     <div class="stepper">
-      <button type="button" data-step="-${dim.step}" aria-label="减少${dim.label}">−</button>
+      <button type="button" data-step="-${dim.step}" aria-label="减少${dim.label}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
       <input type="number" inputmode="numeric" min="${dim.min}" max="${dim.max}" step="1" value="${state[key]}" aria-label="${dim.label}" />
       <span class="unit">mm</span>
-      <button type="button" data-step="${dim.step}" aria-label="增加${dim.label}">+</button>
+      <button type="button" data-step="${dim.step}" aria-label="增加${dim.label}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M8 4v8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
     </div>
   </div>`;
 }
@@ -1031,14 +1031,11 @@ function renderTrimList() {
 function openTrimPicker(key) {
   const position = TRIM_POSITIONS.find((item) => item.key === key);
   if (!position) return;
-  const price = priceInfo();
   const body = `<div class="trim-picker-grid">${TRIMS.map((trim) => `
     <button class="trim-picker-card ${state.trimStyles?.[key] === trim.id ? "is-active" : ""}" type="button" data-pick-trim="${key}" data-trim-style="${trim.id}">
       <span class="trim-picker-art">${trimArt(trim.id)}</span>
       <span class="trim-picker-copy"><b>${trim.name}</b><span>${trim.desc}</span><em>${trim.price ? fmt(trim.price) : "免费"}</em></span>
-    </button>`).join("")}</div>
-    <div class="trim-total"><span>装饰条合计</span><b id="pickerTrimTotal">${fmt(price.trim)}</b></div>
-    <p class="sheet-note">只更换「${position.name}」，其他位置不受影响；模型会实时更新。</p>`;
+    </button>`).join("")}</div>`;
   openSheet({
     title: `选择${position.name}`,
     body,
@@ -2334,8 +2331,6 @@ function bindEvents() {
     $$("#sheetBody .trim-picker-card").forEach((card) => {
       card.classList.toggle("is-active", card.dataset.pickTrim === key && card.dataset.trimStyle === styleId);
     });
-    const pickerTotal = $("#pickerTrimTotal");
-    if (pickerTotal) pickerTotal.textContent = fmt(priceInfo().trim);
   });
 
   $$('[data-action="clear"]').forEach((button) => {
