@@ -51,7 +51,7 @@ const STYLES = [
   {
     id: "float", name: "极简方盒", tone: "暖米", desc: "无侧面 · 干净直边",
     curve: "none", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 300, frontHeight: 220, chimneyWidth: 620, chimneyDepth: 380, chimneyHeight: 680 },
+    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 300, frontHeight: 220, chimneyWidth: 600, chimneyDepth: 380, chimneyHeight: 680 },
     trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
     notch: { enabled: false, shape: "rect", width: 260, height: 50, offset: 90 },
   },
