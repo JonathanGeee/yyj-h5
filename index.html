@@ -27,8 +27,13 @@
           <section class="home-hero" aria-label="定制案例">
             <div class="case-track" id="caseTrack" aria-label="左右滑动查看案例"></div>
             <button class="case-3d" id="case3d" type="button" aria-label="查看 3D 模型">
-              <img src="assets/styles/cloud.png" alt="" />
-              <span>3D 模型</span>
+              <span class="case-3d-viewport" aria-hidden="true">
+                <span class="case-3d-flipper">
+                  <img class="case-3d-face case-3d-front" src="assets/styles/cloud.png" alt="" draggable="false" />
+                  <img class="case-3d-face case-3d-back" alt="" draggable="false" />
+                </span>
+              </span>
+              <span class="case-3d-label">3D 模型</span>
             </button>
           </section>
           <div class="case-progress" id="caseProgress" aria-label="案例切换"></div>

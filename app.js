@@ -493,21 +493,185 @@ function startWithActiveCase() {
   startWithStyle(style);
 }
 
-let caseModelTimer = 0;
+const CASE_FLIP_MS = 480;
+const CASE_FLIP_DEBOUNCE = 120;
+const CASE_SCROLL_LOCK_MS = 900;
 
-function setCaseModel(index) {
-  const thumb = $("#case3d img");
+const caseModel = {
+  front: null,
+  back: null,
+  flipper: null,
+  button: null,
+  current: "",
+  currentIndex: 0,
+  requested: "",
+  requestedIndex: 0,
+  flipTarget: "",
+  flipIndex: 0,
+  timer: 0,
+  animation: null,
+  token: 0,
+  loaded: new Set(),
+};
+let caseScrollTarget = null;
+let caseScrollTimer = 0;
+
+function caseModelSrc(index) {
   const item = HOME_CASES[clamp(index, 0, HOME_CASES.length - 1)];
-  if (!thumb || !item) return;
-  const src = item.model || HOME_3D_IMAGE || item.image;
-  if (thumb.dataset.target === src) return;
-  thumb.dataset.target = src;
-  clearTimeout(caseModelTimer);
-  thumb.classList.add("is-swapping");
-  caseModelTimer = window.setTimeout(() => {
-    thumb.src = src;
-    thumb.classList.remove("is-swapping");
-  }, 140);
+  return item ? (item.model || HOME_3D_IMAGE || item.image) : "";
+}
+
+function cacheCaseModelNodes() {
+  caseModel.button = $("#case3d");
+  caseModel.flipper = $(".case-3d-flipper");
+  caseModel.front = $(".case-3d-front");
+  caseModel.back = $(".case-3d-back");
+}
+
+function preloadCaseModels() {
+  HOME_CASES.forEach((item) => {
+    const src = item.model || HOME_3D_IMAGE || item.image;
+    if (!src || caseModel.loaded.has(src)) return;
+    const image = new Image();
+    image.onload = () => caseModel.loaded.add(src);
+    image.onerror = () => caseModel.loaded.add(src);
+    image.src = src;
+  });
+}
+
+function clearCaseScrollTarget() {
+  caseScrollTarget = null;
+  clearTimeout(caseScrollTimer);
+  caseScrollTimer = 0;
+}
+
+function resetCaseFlipper() {
+  if (!caseModel.flipper) return;
+  caseModel.flipper.style.transition = "none";
+  caseModel.flipper.style.transform = "rotateY(0deg)";
+}
+
+function setCaseModel(index, { immediate = false } = {}) {
+  const normalized = clamp(index, 0, HOME_CASES.length - 1);
+  const src = caseModelSrc(normalized);
+  if (!src) return;
+  if (src === caseModel.current && !caseModel.animation && !caseModel.timer) return;
+  if (src === caseModel.requested && (caseModel.animation || caseModel.timer)) return;
+
+  caseModel.requested = src;
+  caseModel.requestedIndex = normalized;
+  caseModel.button?.setAttribute("aria-label", `查看${HOME_CASES[normalized].name}的 3D 模型`);
+  clearTimeout(caseModel.timer);
+  caseModel.timer = 0;
+
+  if (immediate) {
+    startCaseFlip();
+  } else {
+    caseModel.timer = window.setTimeout(() => {
+      caseModel.timer = 0;
+      startCaseFlip();
+    }, CASE_FLIP_DEBOUNCE);
+  }
+}
+
+function startCaseFlip() {
+  const { button, flipper, front, back } = caseModel;
+  const src = caseModel.requested;
+  const index = caseModel.requestedIndex;
+  if (!button || !flipper || !front || !back || !src) return;
+
+  // 新的切换到来时，先把上一段旋转落到它自己的目标，再开始下一段。
+  if (caseModel.animation) {
+    caseModel.animation.cancel();
+    caseModel.animation = null;
+    if (caseModel.flipTarget && caseModel.flipTarget !== caseModel.current) {
+      caseModel.current = caseModel.flipTarget;
+      caseModel.currentIndex = caseModel.flipIndex;
+      front.src = caseModel.current;
+    }
+    resetCaseFlipper();
+  }
+
+  if (src === caseModel.current) {
+    caseModel.requested = src;
+    caseModel.requestedIndex = index;
+    resetCaseFlipper();
+    button.classList.remove("is-flipping");
+    return;
+  }
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) {
+    front.src = src;
+    caseModel.current = src;
+    caseModel.currentIndex = index;
+    caseModel.flipTarget = src;
+    caseModel.flipIndex = index;
+    resetCaseFlipper();
+    button.classList.remove("is-flipping");
+    return;
+  }
+
+  const direction = index >= caseModel.currentIndex ? 1 : -1;
+  const token = ++caseModel.token;
+  caseModel.flipTarget = src;
+  caseModel.flipIndex = index;
+  back.src = src;
+  resetCaseFlipper();
+  button.classList.add("is-flipping");
+
+  const play = () => {
+    if (token !== caseModel.token) return;
+    if (typeof flipper.animate !== "function") {
+      front.src = src;
+      caseModel.current = src;
+      caseModel.currentIndex = index;
+      resetCaseFlipper();
+      button.classList.remove("is-flipping");
+      return;
+    }
+    // 强制一次布局，确保 flipper 从 0° 开始而不是继承上一段内联值。
+    void flipper.offsetWidth;
+    const animation = flipper.animate([
+      { transform: "rotateY(0deg) scale(1)", offset: 0 },
+      { transform: `rotateY(${direction * 90}deg) scale(0.94)`, offset: 0.5 },
+      { transform: `rotateY(${direction * 180}deg) scale(1)`, offset: 1 },
+    ], {
+      duration: CASE_FLIP_MS,
+      easing: "cubic-bezier(0.3, 0, 0.2, 1)",
+      fill: "forwards",
+    });
+    caseModel.animation = animation;
+    let finished = false;
+    let fallback = 0;
+    const finish = () => {
+      if (finished || token !== caseModel.token) return;
+      finished = true;
+      clearTimeout(fallback);
+      front.src = src;
+      caseModel.current = src;
+      caseModel.currentIndex = index;
+      animation.cancel();
+      caseModel.animation = null;
+      resetCaseFlipper();
+      button.classList.remove("is-flipping");
+    };
+    animation.onfinish = finish;
+    // 后台标签页或动画被节流时，也保证缩略图最终落到新模型。
+    fallback = window.setTimeout(finish, CASE_FLIP_MS + 80);
+  };
+
+  if (back.complete && back.naturalWidth) {
+    play();
+  } else {
+    const onReady = () => {
+      back.onload = null;
+      back.onerror = null;
+      play();
+    };
+    back.onload = onReady;
+    back.onerror = onReady;
+  }
 }
 
 function updateCaseProgress(index) {
@@ -517,15 +681,21 @@ function updateCaseProgress(index) {
     const fill = button.querySelector(".case-fill");
     if (fill) fill.style.transform = "scaleX(0)";
   });
-  setCaseModel(activeCaseIndex);
 }
 
 function snapToCase(index) {
   const track = $("#caseTrack");
   if (!track) return;
   const target = clamp(index, 0, HOME_CASES.length - 1);
-  track.scrollTo({ left: target * track.clientWidth, behavior: "smooth" });
+  caseScrollTarget = target;
+  clearTimeout(caseScrollTimer);
+  caseScrollTimer = window.setTimeout(() => {
+    caseScrollTarget = null;
+    caseScrollTimer = 0;
+  }, CASE_SCROLL_LOCK_MS);
   updateCaseProgress(target);
+  setCaseModel(target, { immediate: true });
+  track.scrollTo({ left: target * track.clientWidth, behavior: "smooth" });
 }
 
 /* ---------- 首页自动轮播 ---------- */
@@ -583,12 +753,21 @@ function bindCaseEvents() {
   track.addEventListener("scroll", () => {
     const index = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
     updateCaseProgress(index);
+    if (caseScrollTarget !== null) {
+      if (index === caseScrollTarget) clearCaseScrollTarget();
+      return;
+    }
+    setCaseModel(index);
   }, { passive: true });
   const syncCaseAfterSwipe = () => window.setTimeout(() => {
     updateCaseProgress(currentCaseIndex());
+    setCaseModel(currentCaseIndex());
     restartCaseAuto();
   }, 300);
-  track.addEventListener("touchstart", pauseCaseAuto, { passive: true });
+  track.addEventListener("touchstart", () => {
+    clearCaseScrollTarget();
+    pauseCaseAuto();
+  }, { passive: true });
   track.addEventListener("touchend", syncCaseAfterSwipe, { passive: true });
 
   // 桌面端：按住鼠标左右拖动也能切换（触屏仍走原生滚动）
@@ -597,6 +776,7 @@ function bindCaseEvents() {
   let dragStartX = 0;
   let dragStartScroll = 0;
   track.addEventListener("pointerdown", (event) => {
+    clearCaseScrollTarget();
     pauseCaseAuto();
     if (event.pointerType !== "mouse" || event.button !== 0) return;
     dragging = true;
@@ -651,12 +831,19 @@ function renderHomeCases() {
   progress.innerHTML = HOME_CASES.map((item, index) =>
     `<button type="button" data-case-index="${index}" aria-label="查看案例 ${index + 1}"><span class="case-fill"></span></button>`
   ).join("");
-  const thumb = $("#case3d img");
-  if (thumb) {
-    const first = HOME_CASES[0];
-    thumb.src = first.model || HOME_3D_IMAGE || first.image;
-    thumb.dataset.target = thumb.getAttribute("src");
-  }
+  cacheCaseModelNodes();
+  const first = HOME_CASES[0];
+  const firstSrc = first ? (first.model || HOME_3D_IMAGE || first.image) : "";
+  if (caseModel.front) caseModel.front.src = firstSrc;
+  if (caseModel.back) caseModel.back.removeAttribute("src");
+  caseModel.current = firstSrc;
+  caseModel.currentIndex = 0;
+  caseModel.requested = firstSrc;
+  caseModel.requestedIndex = 0;
+  caseModel.flipTarget = firstSrc;
+  caseModel.flipIndex = 0;
+  caseModel.button?.setAttribute("aria-label", first ? `查看${first.name}的 3D 模型` : "查看 3D 模型");
+  preloadCaseModels();
   bindCaseEvents();
   updateCaseProgress(0);
 }
