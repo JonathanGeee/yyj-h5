@@ -1581,25 +1581,70 @@ function orderDrawingSvg(part) {
   </svg>`;
 }
 
+function orderTrimSvg(part) {
+  const count = Math.max(1, Math.min(5, Number(part.count) || 3));
+  const barWidth = 124;
+  const barHeight = 6;
+  const gap = 4;
+  const totalHeight = count * barHeight + (count - 1) * gap;
+  const x = (160 - barWidth) / 2;
+  const top = 48 - totalHeight / 2;
+  const bars = Array.from({ length: count }, (_, index) => {
+    const y = top + index * (barHeight + gap);
+    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="${barHeight / 2}" fill="rgba(36, 92, 69, 0.08)" stroke="#245c45" stroke-width="1"/>`;
+  }).join("");
+  return `<svg viewBox="0 0 160 96" aria-hidden="true">${bars}</svg>`;
+}
+
 function orderDrawingTile(part) {
+  const art = part.kind === "trim" ? orderTrimSvg(part) : orderDrawingSvg(part);
   return `<article class="drawing-tile">
-    <div class="drawing-art">${orderDrawingSvg(part)}</div>
+    <div class="drawing-art">${art}</div>
     <b>${esc(part.name)}</b>
     <span>${esc(part.size)}</span>
     ${part.note ? `<em>${esc(part.note)}</em>` : ""}
   </article>`;
 }
 
-function orderDrawingGroup(title, parts) {
-  if (!parts.length) return "";
-  const sorted = parts.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h) || b.w - a.w);
-  return `<section class="drawing-group">
-    <h3>${esc(title)}</h3>
-    <div class="drawing-row">${sorted.map(orderDrawingTile).join("")}</div>
-  </section>`;
+function orderDrawingSort(parts) {
+  return parts.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h) || b.w - a.w);
 }
 
-function buildOrderDrawings(config) {
+function orderTrimParts(config) {
+  const styles = config.trimStyles || {};
+  const notchEnabled = config.notchEnabled !== false;
+  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
+  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
+  const chimneyWidth = orderDetailNumber(config.chimneyWidth, 320);
+  const chimneyDepth = orderDetailNumber(config.chimneyDepth, 280);
+  const surfaceType = config.surfaceType || "concave";
+  return TRIM_POSITIONS.flatMap((position) => {
+    const styleId = styles[position.key] || "none";
+    const trim = TRIMS.find((item) => item.id === styleId);
+    if (!trim || trim.id === "none") return [];
+    if (position.key === "start" && surfaceType === "none") return [];
+    const isHood = position.key === "hoodTop" || position.key === "hoodBottom";
+    const front = isHood ? hoodWidth : chimneyWidth;
+    const side = isHood ? hoodDepth : chimneyDepth;
+    let count = 3;
+    let size = `3 根 · 正面 ${front} / 侧 ${side}mm`;
+    if (position.key === "hoodBottom" && notchEnabled) {
+      count = 5;
+      size = `5 根 · 两侧 ${side} + 正面分 3 段`;
+    }
+    return [{
+      name: `${position.name}装饰条`,
+      w: front,
+      h: 1,
+      kind: "trim",
+      count,
+      size,
+      note: trim.name,
+    }];
+  });
+}
+
+function buildOrderDrawingGroups(config) {
   const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
   const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
   const rearHeight = orderDetailNumber(config.rearHeight, 380);
@@ -1658,12 +1703,26 @@ function buildOrderDrawings(config) {
     : [];
 
   const groups = [
-    orderDrawingGroup("下横", lower),
-    orderDrawingGroup("上竖", upper),
-    orderDrawingGroup(surfaceType === "flat" ? "过渡面" : "曲面", transition),
-    orderDrawingGroup("垫高", shims),
-  ].filter(Boolean);
-  return `${groups.join("")}<p class="drawing-note">展开图为示意，实际下料以工厂图纸为准。</p>`;
+    { id: "lower", title: "下横", parts: orderDrawingSort(lower) },
+    { id: "upper", title: "上竖", parts: orderDrawingSort(upper) },
+  ];
+  if (transition.length) {
+    groups.push({ id: "curve", title: surfaceType === "flat" ? "过渡面" : "曲面", parts: orderDrawingSort(transition) });
+  }
+  if (shims.length) {
+    groups.push({ id: "shim", title: "垫高", parts: orderDrawingSort(shims) });
+  }
+  const trims = orderTrimParts(config);
+  if (trims.length) {
+    const total = trims.reduce((sum, part) => sum + part.count, 0);
+    groups.push({
+      id: "trim",
+      title: "装饰条",
+      parts: trims,
+      summary: `共 ${total} 根 · ${trims.length} 个位置`,
+    });
+  }
+  return groups;
 }
 
 function disposeOrderPreview() {
@@ -1713,13 +1772,8 @@ function renderOrderDetail() {
 
   disposeOrderPreview();
   root.innerHTML = `
-    <section class="order-model-card">
-      <div class="order-model-tabs" id="orderModelTabs" role="tablist" aria-label="订单预览">
-        <button type="button" role="tab" data-order-tab="model" aria-selected="true">3D 模型</button>
-        <button type="button" role="tab" data-order-tab="drawing" aria-selected="false">展开图纸</button>
-      </div>
-      <div class="order-model-stage" id="orderModelStage" role="tabpanel" aria-label="3D 模型"></div>
-      <div class="order-drawing" id="orderDrawing" role="tabpanel" aria-label="展开图纸" hidden>${buildOrderDrawings(config)}</div>
+    <section class="order-model-hero" aria-label="订单 3D 模型">
+      <div class="order-model-stage" id="orderModelStage"></div>
     </section>
     <section class="order-detail-card">
       <div class="order-detail-head">
@@ -1736,24 +1790,53 @@ function renderOrderDetail() {
     </section>
   `;
 
-  $("#orderModelTabs")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-order-tab]");
-    if (!button) return;
-    setOrderPreviewTab(button.dataset.orderTab);
-  });
-
   mountOrderPreview(orderInstallConfig(order));
 }
 
-function setOrderPreviewTab(tab) {
-  const isDrawing = tab === "drawing";
-  $$("#orderModelTabs button").forEach((button) => {
-    button.setAttribute("aria-selected", String(button.dataset.orderTab === tab));
+function openOrderDrawing() {
+  if (!activeOrder) return;
+  const groups = buildOrderDrawingGroups(orderInstallConfig(activeOrder));
+  if (!groups.length) return;
+
+  openSheet({
+    title: "展开图纸",
+    backdrop: "light",
+    sheetClass: "sheet--drawing",
+    body: `
+      <div class="order-drawing-sheet">
+        <nav class="drawing-tabs" id="drawingTabs" role="tablist" aria-label="部件图纸">
+          ${groups.map((group, index) => `<button type="button" role="tab" data-drawing-tab="${group.id}" aria-selected="${index === 0}">${esc(group.title)}</button>`).join("")}
+        </nav>
+        <div class="drawing-panel" id="drawingPanel" role="tabpanel"></div>
+      </div>
+    `,
+    actions: [{ label: "关闭", kind: "text", onClick: closeSheet }],
   });
-  const stage = $("#orderModelStage");
-  const drawing = $("#orderDrawing");
-  if (stage) stage.hidden = isDrawing;
-  if (drawing) drawing.hidden = !isDrawing;
+
+  const nav = $("#drawingTabs");
+  const panel = $("#drawingPanel");
+  if (!nav || !panel) return;
+
+  const apply = (id) => {
+    const group = groups.find((item) => item.id === id) || groups[0];
+    nav.querySelectorAll("button").forEach((button) => {
+      button.setAttribute("aria-selected", String(button.dataset.drawingTab === group.id));
+    });
+    panel.innerHTML = `
+      <div class="drawing-meta">
+        <span>${esc(group.summary || `共 ${group.parts.length} 件`)}</span>
+        <span>单位 mm</span>
+      </div>
+      <div class="drawing-row">${group.parts.map(orderDrawingTile).join("")}</div>
+      <p class="drawing-note">展开图为示意，实际下料以工厂图纸为准。</p>
+    `;
+  };
+
+  nav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-drawing-tab]");
+    if (button) apply(button.dataset.drawingTab);
+  });
+  apply(groups[0].id);
 }
 
 function openServiceSheet() {
@@ -2217,7 +2300,7 @@ function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose 
   lastFocused = document.activeElement;
   const sheet = $(".sheet");
   if (sheet) {
-    sheet.classList.remove("sheet--install", "sheet--order");
+    sheet.classList.remove("sheet--install", "sheet--order", "sheet--drawing");
     if (sheetClass) sheet.classList.add(sheetClass);
   }
   $("#sheetTitle").textContent = title;
@@ -2245,7 +2328,7 @@ function closeSheet() {
   const cleanup = sheetCleanup;
   sheetCleanup = null;
   if (cleanup) cleanup();
-  $(".sheet")?.classList.remove("sheet--install", "sheet--order");
+  $(".sheet")?.classList.remove("sheet--install", "sheet--order", "sheet--drawing");
   $("#sheetRoot").hidden = true;
   $("#sheetRoot").classList.remove("is-light");
   document.body.classList.remove("sheet-open");
@@ -2560,6 +2643,7 @@ function bindEvents() {
   $("#orderInstallBtn")?.addEventListener("click", () => {
     if (activeOrder) openInstallGuide(orderInstallConfig(activeOrder));
   });
+  $("#orderDrawingBtn")?.addEventListener("click", openOrderDrawing);
 
   $("#orderSearchForm")?.addEventListener("submit", (event) => {
     event.preventDefault();

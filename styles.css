@@ -822,11 +822,27 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   transform: translateX(-50%);
   pointer-events: none;
 }
-.order-detail-bar .btn {
+.order-detail-actions {
+  display: flex;
+  overflow: hidden;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(36, 92, 69, 0.18);
   pointer-events: auto;
-  height: 48px;
-  font-size: 14px;
 }
+.order-detail-actions .btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  height: 48px;
+  padding: 0 10px;
+  border-radius: 0;
+  font-size: 14px;
+  box-shadow: none;
+}
+.order-detail-actions .btn:first-child { border-radius: 999px 0 0 999px; }
+.order-detail-actions .btn:last-child { border-radius: 0 999px 999px 0; }
+.order-detail-actions #orderDrawingBtn { color: var(--green); background: var(--green-soft); }
+.order-detail-actions #orderInstallBtn { color: #fff; background: var(--green); }
 
 
 .order-detail-card {
@@ -866,69 +882,50 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .order-detail-total b { color: var(--green); font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
 
 /* ---------- 订单模型 / 图纸 ---------- */
-.order-model-card {
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(74, 55, 31, 0.05);
-}
-.order-model-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 999px;
-  background: #f3f5f1;
-}
-.order-model-tabs button {
-  flex: 1;
-  height: 34px;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  background: transparent;
-  font-size: 11.5px;
-  font-weight: 650;
-  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-.order-model-tabs button[aria-selected="true"] {
-  color: var(--green);
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(74, 55, 31, 0.08);
+.order-model-hero {
+  margin: -14px -16px 0;
 }
 .order-model-stage {
   position: relative;
-  height: 236px;
-  margin-top: 8px;
+  height: 268px;
   overflow: hidden;
-  border-radius: 14px;
-  background: radial-gradient(circle at 50% 38%, #fbfaf6 0%, #f2f0ea 78%);
+  background: transparent;
   touch-action: none;
 }
 .order-model-stage canvas { display: block; width: 100%; height: 100%; }
-.order-model-stage[hidden],
-.order-drawing[hidden] { display: none; }
 .order-model-stage.is-fallback { display: grid; place-items: center; color: var(--muted); font-size: 11px; }
-.order-drawing { margin-top: 10px; padding: 0 2px 2px; }
-.drawing-group + .drawing-group { margin-top: 15px; }
-.drawing-group h3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 7px;
-  color: var(--ink-2);
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.03em;
+.order-drawing-sheet { padding: 0 1px 2px; }
+.drawing-tabs { display: flex; gap: 4px; margin: 2px 0 10px; }
+.drawing-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 36px;
+  padding: 0 3px;
+  border: 1px solid rgba(214, 204, 187, 0.7);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.drawing-group h3::before {
-  content: "";
-  width: 3px;
-  height: 10px;
-  border-radius: 999px;
+.drawing-tabs button[aria-selected="true"] {
+  border-color: var(--green);
+  color: #fff;
   background: var(--green);
-  opacity: 0.72;
+  box-shadow: 0 5px 12px rgba(36, 92, 69, 0.16);
 }
+.drawing-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 8px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.drawing-meta span:first-child { color: var(--ink-2); font-weight: 600; }
 .drawing-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -947,7 +944,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .drawing-tile > span { display: block; margin-top: 1px; color: var(--muted); font-size: 8.5px; font-variant-numeric: tabular-nums; }
 .drawing-tile > em { display: block; margin-top: 1px; color: var(--faint); font-size: 8px; font-style: normal; }
 .drawing-note { margin: 12px 0 2px; color: var(--faint); font-size: 8.5px; text-align: center; }
-.order-model-card + .order-detail-card { margin-top: 14px; }
+.order-model-hero + .order-detail-card { margin-top: 4px; }
 
 /* ---------- 安装说明 ---------- */
 .view--install {
@@ -1111,6 +1108,26 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   font-size: 15px;
   font-weight: 650;
 }
+
+.sheet.sheet--drawing {
+  background: #f7f6f2;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.sheet.sheet--drawing .sheet-body { margin-top: 6px; }
+.sheet.sheet--drawing .sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 10px;
+  padding-top: 8px;
+  background: linear-gradient(to top, #f7f6f2 72%, rgba(247, 246, 242, 0.88) 100%);
+}
+.sheet.sheet--drawing .sheet-actions .btn {
+  height: 46px;
+  font-size: 14px;
+}
+.sheet--drawing .drawing-art { height: 70px; }
 
 /* ---------- 下单半屏 ---------- */
 .sheet.sheet--order {
