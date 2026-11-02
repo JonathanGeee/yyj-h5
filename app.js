@@ -1752,8 +1752,6 @@ function orderPayHtml() {
           <img id="payQr" alt="微信收款二维码" />
           <div id="payQrFallback" class="qr-fallback" hidden>${qrFallbackMarkup()}</div>
         </div>
-        <p class="qr-hint">长按识别二维码支付</p>
-        <div class="pay-order">订单编号 <b id="payOrderNo">—</b></div>
       </div>
     </div>`;
 }
@@ -1896,7 +1894,6 @@ function setOrderStep(step) {
   if (step === 1) {
     const order = pendingOrder || flow.order;
     if ($("#payAmount")) $("#payAmount").textContent = fmt(order?.price?.total ?? priceInfo().total);
-    if ($("#payOrderNo")) $("#payOrderNo").textContent = order?.id || "—";
     setupQr();
   }
 

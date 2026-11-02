@@ -1115,7 +1115,13 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .order-step[hidden] { display: none; }
 .sheet.sheet--order #checkoutForm { padding: 0; }
-.sheet.sheet--order .pay-card { margin: 0; padding: 16px 16px 14px; }
+.sheet.sheet--order .pay-card {
+  margin: 0;
+  padding: 16px 16px 14px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
 .sheet.sheet--order .pay-amount b { font-size: 32px; }
 .sheet.sheet--order .qr-wrap { margin-top: 10px; }
 .order-step-service { text-align: center; }
