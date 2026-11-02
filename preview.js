@@ -21,6 +21,7 @@ export function createPreview(container, initialState, options = {}) {
   const softLighting = Boolean(options.softLighting);
   const aspectFit = Boolean(options.aspectFit);
   const thumbnail = Boolean(options.thumbnail);
+  const showEdges = options.edges !== false;
   const pixelRatio = Number(options.pixelRatio) || (thumbnail ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2));
   let state = { ...initialState };
   let scene;
@@ -40,8 +41,7 @@ export function createPreview(container, initialState, options = {}) {
   let spinRaf = 0;
   let spinToken = 0;
   let spinFallbackTimer = 0;
-  let thumbGhost = null;
-  let thumbTransition = null;
+  let thumbMorph = null;
   const flashItems = [];
   const dimMaterials = new Map();
 
@@ -95,7 +95,7 @@ export function createPreview(container, initialState, options = {}) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     model.add(mesh);
-    if (outline) {
+    if (outline && showEdges) {
       const edgePoints = points.map(([u, v]) => project(u, v));
       edgePoints.push(edgePoints[0]);
       const edge = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints), edgeMat);
@@ -429,11 +429,15 @@ export function createPreview(container, initialState, options = {}) {
     model.add(mesh);
   }
 
-  function buildModel() {
-    const palette = STYLE_PALETTE[state.styleId] || STYLE_PALETTE.cloud;
+  function applyPalette(styleId) {
+    const palette = STYLE_PALETTE[styleId] || STYLE_PALETTE.cloud;
     shellMat.color.setHex(palette.shell);
     transitionMat.color.setHex(palette.shell);
     trimMat.color.setHex(palette.trim);
+  }
+
+  function buildModel() {
+    applyPalette(state.styleId);
     const shim = clamp(state.shimHeight, 0, 60);
     const width = state.hoodWidth + 2 * (INSTALL_CLEARANCE + PANEL_THICKNESS);
     const depth = state.hoodDepth + PANEL_THICKNESS;
@@ -1038,16 +1042,21 @@ export function createPreview(container, initialState, options = {}) {
     renderer.render(scene, camera);
   }
 
-  function update(nextState) {
+  function rebuildModelState(nextState) {
     restoreHighlight();
     state = { ...nextState };
     if (!model) return;
-    const viewDirection = camera.position.clone().sub(controls.target).normalize();
     model.traverse((object) => {
       object.geometry?.dispose();
     });
     model.clear();
     buildModel();
+  }
+
+  function update(nextState) {
+    const viewDirection = camera.position.clone().sub(controls.target).normalize();
+    rebuildModelState(nextState);
+    if (!model) return;
     const box = new THREE.Box3().setFromObject(model);
     if (!box.isEmpty()) {
       const center = box.getCenter(new THREE.Vector3()).add(targetOffset);
@@ -1067,111 +1076,60 @@ export function createPreview(container, initialState, options = {}) {
     return v * v * (3 - 2 * v);
   }
 
-  function cloneGhostMaterials(group) {
-    const cache = new Map();
-    const entries = [];
-    const cloneOne = (material) => {
-      if (!material) return material;
-      if (cache.has(material)) return cache.get(material);
-      const clone = material.clone();
-      const baseOpacity = Number.isFinite(material.opacity) ? material.opacity : 1;
-      clone.transparent = true;
-      clone.opacity = baseOpacity;
-      clone.depthWrite = false;
-      clone.needsUpdate = true;
-      cache.set(material, clone);
-      entries.push({ material: clone, baseOpacity });
-      return clone;
-    };
-    group.traverse((object) => {
-      if (!object.material) return;
-      object.material = Array.isArray(object.material)
-        ? object.material.map(cloneOne)
-        : cloneOne(object.material);
-      object.renderOrder = 2;
-    });
-    return entries;
-  }
-
-  function setGhostOpacity(value) {
-    if (!thumbGhost) return;
-    const opacity = Math.min(1, Math.max(0, value));
-    for (const entry of thumbGhost.materials) {
-      entry.material.opacity = entry.baseOpacity * opacity;
+  function interpolatePreviewState(from, to, t) {
+    const result = { ...from };
+    for (const key of Object.keys(to)) {
+      const a = Number(from[key]);
+      const b = Number(to[key]);
+      if (typeof to[key] === "number" && Number.isFinite(a) && Number.isFinite(b)) {
+        result[key] = a + (b - a) * t;
+      }
     }
+    const late = t >= 0.5;
+    result.styleId = late ? to.styleId : from.styleId;
+    result.surfaceType = late ? to.surfaceType : from.surfaceType;
+    result.surfaceStart = late ? to.surfaceStart : from.surfaceStart;
+    result.notchEnabled = late ? to.notchEnabled : from.notchEnabled;
+    result.notchShape = late ? to.notchShape : from.notchShape;
+    result.trimStyles = { ...(late ? to.trimStyles : from.trimStyles) };
+    return result;
   }
 
-  function disposeGhost() {
-    if (!thumbGhost) return;
-    const { group, materials } = thumbGhost;
-    thumbGhost = null;
-    scene.remove(group);
-    group.traverse((object) => {
-      object.geometry?.dispose?.();
-    });
-    for (const entry of materials) entry.material.dispose?.();
-  }
-
-  function beginMainFade() {
-    for (const material of [shellMat, transitionMat, trimMat]) {
-      material.transparent = true;
-      material.opacity = 0;
-      material.depthWrite = false;
-      material.needsUpdate = true;
-    }
-    edgeMat.transparent = true;
-    edgeMat.opacity = 0;
-    edgeMat.needsUpdate = true;
-  }
-
-  function setMainFade(value) {
-    const opacity = Math.min(1, Math.max(0, value));
-    shellMat.opacity = opacity;
-    transitionMat.opacity = opacity;
-    trimMat.opacity = opacity;
-    edgeMat.opacity = 0.58 * opacity;
-  }
-
-  function endMainFade() {
-    for (const material of [shellMat, transitionMat, trimMat]) {
-      material.transparent = false;
-      material.opacity = 1;
-      material.depthWrite = true;
-      material.needsUpdate = true;
-    }
-    edgeMat.transparent = true;
-    edgeMat.opacity = 0.58;
-    edgeMat.needsUpdate = true;
-  }
-
-  function completeThumbTransition(transition = thumbTransition) {
-    if (!transition || thumbTransition !== transition) return;
+  function completeThumbMorph(morph = thumbMorph) {
+    if (!morph || thumbMorph !== morph) return;
     if (spinRaf) cancelAnimationFrame(spinRaf);
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
     spinFallbackTimer = 0;
-    thumbTransition = null;
-    setMainFade(1);
-    endMainFade();
-    disposeGhost();
-    fitDistance = transition.newFit;
-    controls.target.copy(transition.newCenter);
-    const finalTheta = transition.startTheta + transition.direction * Math.PI * 2;
-    const finalRadius = Math.cos(transition.startElevation) * transition.newFit;
-    const finalY = Math.sin(transition.startElevation) * transition.newFit;
+    thumbMorph = null;
+
+    scene.remove(morph.oldGroup);
+    morph.oldGroup.traverse((object) => {
+      object.geometry?.dispose?.();
+    });
+    morph.targetGroup.visible = true;
+    model = morph.targetGroup;
+    state = { ...morph.toState };
+    applyPalette(state.styleId);
+
+    fitDistance = morph.targetFit;
+    controls.target.copy(morph.targetCenter);
+    const finalTheta = morph.startTheta;
+    const finalRadius = Math.cos(morph.startElevation) * morph.targetFit;
+    const finalY = Math.sin(morph.startElevation) * morph.targetFit;
     camera.position.set(
-      transition.newCenter.x + Math.sin(finalTheta) * finalRadius,
-      transition.newCenter.y + finalY,
-      transition.newCenter.z + Math.cos(finalTheta) * finalRadius
+      morph.targetCenter.x + Math.sin(finalTheta) * finalRadius,
+      morph.targetCenter.y + finalY,
+      morph.targetCenter.z + Math.cos(finalTheta) * finalRadius
     );
-    camera.lookAt(transition.newCenter);
+    camera.lookAt(morph.targetCenter);
     camera.near = Math.max(1, fitDistance / 100);
     camera.far = fitDistance * 100;
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
   }
 
-  // 首页缩略图专用：旧模型淡出、新模型淡入，同时相机绕模型转一整圈。
+  // 首页缩略图专用：只保留一个模型，边转边把尺寸/形状参数从旧款插值到新款。
   function spinToState(nextState, spinOptions = {}) {
     if (!thumbnail) {
       update(nextState);
@@ -1180,7 +1138,7 @@ export function createPreview(container, initialState, options = {}) {
     const direction = spinOptions.direction === -1 ? -1 : 1;
     const duration = Math.max(0, Number(spinOptions.duration) || 900);
 
-    if (thumbTransition) completeThumbTransition(thumbTransition);
+    if (thumbMorph) completeThumbMorph(thumbMorph);
     if (spinRaf) cancelAnimationFrame(spinRaf);
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
@@ -1198,49 +1156,59 @@ export function createPreview(container, initialState, options = {}) {
       update(nextState);
       return;
     }
+    const fromState = { ...state };
     const startTarget = controls.target.clone();
     const startOffset = camera.position.clone().sub(startTarget);
     const startDist = Math.max(1, startOffset.length());
     const startTheta = Math.atan2(startOffset.x, startOffset.z);
     const startElevation = Math.asin(Math.min(1, Math.max(-1, startOffset.y / startDist)));
 
-    thumbGhost = { group: oldGroup, materials: cloneGhostMaterials(oldGroup) };
-    setGhostOpacity(1);
-
-    const newGroup = new THREE.Group();
-    scene.add(newGroup);
-    model = newGroup;
-    state = { ...nextState };
-    buildModel();
-
-    const box = new THREE.Box3().setFromObject(newGroup);
-    const newCenter = box.isEmpty()
+    // 预先把目标模型建在隐藏组里，只用来拿精确的包围盒和最终画面。
+    const targetGroup = new THREE.Group();
+    scene.add(targetGroup);
+    model = targetGroup;
+    rebuildModelState(nextState);
+    targetGroup.visible = false;
+    const targetBox = new THREE.Box3().setFromObject(targetGroup);
+    const targetCenter = targetBox.isEmpty()
       ? startTarget.clone()
-      : box.getCenter(new THREE.Vector3()).add(targetOffset);
-    const newFit = box.isEmpty() ? startDist : distanceFor(box);
-    beginMainFade();
+      : targetBox.getCenter(new THREE.Vector3()).add(targetOffset);
+    const targetFit = targetBox.isEmpty() ? startDist : distanceFor(targetBox);
 
-    const token = ++spinToken;
-    const transition = {
-      newCenter,
-      newFit,
+    model = oldGroup;
+    oldGroup.visible = true;
+    state = { ...fromState };
+    applyPalette(state.styleId);
+
+    const morph = {
+      fromState,
+      toState: { ...nextState },
+      oldGroup,
+      targetGroup,
+      targetCenter,
+      targetFit,
       startTarget,
       startDist,
       startTheta,
       startElevation,
       direction,
       duration,
+      started: performance.now(),
+      lastBuild: performance.now(),
     };
-    thumbTransition = transition;
-    const started = performance.now();
+    thumbMorph = morph;
+    const token = ++spinToken;
 
     const frame = (now) => {
-      if (token !== spinToken || thumbTransition !== transition) return;
-      const t = Math.min(1, (now - started) / duration);
-      const eased = t;
-      const target = startTarget.clone().lerp(newCenter, eased);
-      const distance = startDist + (newFit - startDist) * eased;
-      const theta = startTheta + direction * Math.PI * 2 * eased;
+      if (token !== spinToken || thumbMorph !== morph) return;
+      const t = Math.min(1, (now - morph.started) / duration);
+      const target = startTarget.clone().lerp(targetCenter, t);
+      const distance = startDist + (targetFit - startDist) * t;
+      // 只在前侧转到侧面再回来，不把贴墙的开口背面转出来。
+      const swing = direction > 0
+        ? Math.PI / 2 - startTheta
+        : Math.PI / 2 + startTheta;
+      const theta = startTheta + direction * swing * Math.sin(Math.PI * t);
       const radius = Math.cos(startElevation) * distance;
       const yOffset = Math.sin(startElevation) * distance;
       camera.position.set(
@@ -1254,9 +1222,11 @@ export function createPreview(container, initialState, options = {}) {
       camera.far = distance * 100;
       camera.updateProjectionMatrix();
 
-      const fade = smoothstep((t - 0.3) / 0.4);
-      setMainFade(fade);
-      setGhostOpacity(1 - fade);
+      // 几何不需要每帧重建：相机继续每帧转，形状约每 55ms 追一次，避免主线程卡顿。
+      if (t < 1 && now - morph.lastBuild >= 55) {
+        rebuildModelState(interpolatePreviewState(fromState, nextState, t));
+        morph.lastBuild = now;
+      }
       renderer.render(scene, camera);
 
       if (t < 1) {
@@ -1264,12 +1234,12 @@ export function createPreview(container, initialState, options = {}) {
         return;
       }
       spinRaf = 0;
-      completeThumbTransition(transition);
+      completeThumbMorph(morph);
     };
 
     spinRaf = requestAnimationFrame(frame);
     spinFallbackTimer = window.setTimeout(() => {
-      completeThumbTransition(transition);
+      completeThumbMorph(morph);
     }, duration + 120);
   }
 
@@ -1375,8 +1345,15 @@ export function createPreview(container, initialState, options = {}) {
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
     spinFallbackTimer = 0;
-    thumbTransition = null;
-    disposeGhost();
+    if (thumbMorph) {
+      const { oldGroup, targetGroup } = thumbMorph;
+      thumbMorph = null;
+      scene?.remove(oldGroup);
+      oldGroup.traverse((object) => object.geometry?.dispose?.());
+      scene?.remove(targetGroup);
+      targetGroup.traverse((object) => object.geometry?.dispose?.());
+      model = null;
+    }
     clearFocus();
     restoreHighlight();
     observer?.disconnect();

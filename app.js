@@ -561,6 +561,7 @@ async function ensureCaseThumb() {
       fitMargin: 1.9,
       direction: [0.42, 0.14, 1.5],
       pixelRatio: 1.5,
+      edges: false,
     });
     caseThumbApi = api;
     caseThumbIndex = initialIndex;
