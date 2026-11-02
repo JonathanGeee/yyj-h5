@@ -12,6 +12,10 @@ const CONFIG = {
     : "/api/orders",
 };
 
+// preview.js 会被浏览器按 URL 缓存；改动 preview.js 时同步更新这里的版本号，
+// 避免首页拿不到新的 3D 接口而退化成普通跳转。
+const PREVIEW_MODULE_URL = "./preview.js?v=20261103-3";
+
 const STYLES = [
   {
     id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 双层收边",
@@ -360,9 +364,12 @@ let activeTab = "upper";
 let activeCaseIndex = 0;
 let activeInstallKey = "base";
 let previewApi = null;
-let previewLoading = false;
 let previewFailed = false;
 let previewTimer = 0;
+let previewPromise = null;
+let heroTransition = null;
+let lastRenderedRoute = null;
+const HERO_GROW_MS = 820;
 let toastTimer = 0;
 let pendingOrder = null;
 let lastOrder = null;
@@ -475,23 +482,279 @@ function applyPreset(style) {
 }
 
 /* ---------- 首页案例 ---------- */
-function startWithStyle(style) {
-  applyPreset(style);
-  go("customize");
+function heroMotionAllowed() {
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    && typeof Element.prototype.animate === "function";
+}
+
+function resetHeroPreview() {
+  const preview = $("#preview3d");
+  if (!preview) return;
+  preview.style.transform = "";
+  preview.style.transformOrigin = "";
+}
+
+function finishHeroTransition() {
+  const active = heroTransition;
+  if (!active) return;
+  heroTransition = null;
+  clearTimeout(active.timer);
+  if (active.animation) {
+    active.animation.onfinish = null;
+    try { active.animation.cancel(); } catch { /* 忽略 */ }
+  }
+  resetHeroPreview();
+  if (active.mode === "reverse") {
+    // 反向动画结束时，首页已经在下面铺好，直接同一帧换回首页。
+    suppressCaseScroll = false;
+    active.homeView?.classList.remove("is-hero-reverse-home");
+    active.homeView?.classList.add("no-view-in");
+    active.view?.classList.remove("is-hero-reverse", "is-hero-measuring", "is-hero-entering", "is-hero-active");
+    applyRoute("home");
+    normalizeCaseScroll();
+    return;
+  }
+  if (active.view) {
+    // 动画结束后保持“无 viewIn”，否则移除过渡类会重新触发整页淡入。
+    active.view.classList.add("no-view-in");
+    active.view.classList.remove("is-hero-measuring", "is-hero-entering", "is-hero-active");
+  }
+}
+
+function abortHeroTransition() {
+  const active = heroTransition;
+  if (!active) return;
+  heroTransition = null;
+  clearTimeout(active.timer);
+  if (active.animation) {
+    active.animation.onfinish = null;
+    try { active.animation.cancel(); } catch { /* 忽略 */ }
+  }
+  resetHeroPreview();
+  if (active.mode === "reverse") {
+    suppressCaseScroll = false;
+    active.homeView?.classList.remove("is-hero-reverse-home");
+    active.view?.classList.remove("is-hero-reverse", "is-hero-measuring", "is-hero-entering", "is-hero-active");
+  } else if (active.view) {
+    active.view.classList.remove("is-hero-measuring", "is-hero-entering", "is-hero-active");
+  }
+  previewApi?.stopIntroSpin?.();
+}
+
+// 首页 3D 小图 → 定制页：先把定制页按最终布局藏在屏幕外测量好，
+// 再用 transform 把定制页模型缩到小图模型的位置，随后一边旋转一边放大到位。
+function startHeroTransition(sourceRect) {
+  const view = $(".view--customize");
+  const previewEl = $("#preview3d");
+  if (!view || !previewEl || !sourceRect || !heroMotionAllowed()) return false;
+  if (previewFailed || Math.abs(window.scrollY) > 4) return false;
+  if (sourceRect.width < 8 || sourceRect.height < 8) return false;
+  if (sourceRect.bottom < 0 || sourceRect.top > window.innerHeight) return false;
+
+  const token = {};
+  heroTransition = { token, mode: "forward", view, animation: null, timer: 0 };
+  view.classList.add("is-hero-measuring");
+
+  (async () => {
+    try {
+      const api = await ensurePreview();
+      if (!heroTransition || heroTransition.token !== token) return;
+      if (!api || typeof api.modelScreenRect !== "function") {
+        abortHeroTransition();
+        go("customize");
+        return;
+      }
+
+      api.resizeNow?.();
+      api.cameraOverview?.(0);
+      const dest = api.modelScreenRect();
+      if (!dest || dest.width < 8 || dest.height < 8) {
+        abortHeroTransition();
+        go("customize");
+        return;
+      }
+
+      const scale = clamp(sourceRect.height / dest.height, 0.02, 1);
+      const dx = sourceRect.centerX - dest.centerX;
+      const dy = sourceRect.centerY - dest.centerY;
+      const startTransform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+      const previewRect = previewEl.getBoundingClientRect();
+      const originX = dest.centerX - previewRect.left;
+      const originY = dest.centerY - previewRect.top;
+
+      // 先切路由，再在同一帧里把模型摆到小图位置，避免看到模型跳变。
+      view.classList.add("is-hero-entering");
+      goNow("customize");
+      if (!heroTransition || heroTransition.token !== token) return;
+
+      previewEl.style.transformOrigin = `${originX}px ${originY}px`;
+      previewEl.style.transform = startTransform;
+      view.classList.remove("is-hero-measuring");
+      view.classList.add("is-hero-active");
+
+      api.introSpin?.(HERO_GROW_MS + 100);
+      const animation = previewEl.animate(
+        [
+          { transform: startTransform, offset: 0 },
+          { transform: "translate(0px, 0px) scale(1)", offset: 1 },
+        ],
+        {
+          duration: HERO_GROW_MS,
+          easing: "cubic-bezier(0.2, 0.72, 0.18, 1)",
+          fill: "both",
+        }
+      );
+      heroTransition.animation = animation;
+      const finish = () => finishHeroTransition();
+      animation.onfinish = finish;
+      heroTransition.timer = window.setTimeout(finish, HERO_GROW_MS + 160);
+    } catch (error) {
+      console.warn("首页 3D 模型衔接失败，改为普通切换", error);
+      if (heroTransition && heroTransition.token === token) {
+        const route = currentRoute();
+        abortHeroTransition();
+        if (route !== "customize") go("customize");
+      }
+    }
+  })();
+
+  return true;
+}
+
+// 定制页 → 首页：主模型绕自身转一圈，同时缩回右下角 3D 小图的位置。
+// 首页先按最终布局藏在屏幕外量好小图模型，动画结束的同一帧再换回首页。
+function startReverseHero() {
+  const previewEl = $("#preview3d");
+  const view = $(".view--customize");
+  const homeView = $('.view[data-view="home"]');
+  if (!previewApi || !previewEl || !view || !homeView) return false;
+  if (!caseThumbApi || typeof caseThumbApi.modelScreenRect !== "function") return false;
+  if (previewFailed || !heroMotionAllowed() || Math.abs(window.scrollY) > 4) return false;
+  if (sheetOpen || view.classList.contains("is-hero-active")) return false;
+
+  const startRect = previewApi.modelScreenRect?.();
+  if (!startRect || startRect.width < 8 || startRect.height < 8) return false;
+
+  const token = {};
+  suppressCaseScroll = true;
+  try {
+    // 首页按最终布局在定制页下面铺好：小图就在落点处，主模型缩回去时直接叠到它上面。
+    homeView.classList.add("is-hero-reverse-home");
+    ensureCaseTrackPosition();
+    const track = $("#caseTrack");
+    if (track && track.clientWidth) {
+      const targetLeft = virtualCaseForReal(activeCaseIndex) * track.clientWidth;
+      if (Math.abs(track.scrollLeft - targetLeft) > 1) track.scrollLeft = targetLeft;
+    }
+    caseThumbApi.resizeNow?.();
+    const dest = caseThumbApi.modelScreenRect?.();
+    const endDirection = caseThumbApi.getViewDirection?.() || null;
+    if (!dest || dest.width < 8 || dest.height < 8) {
+      homeView.classList.remove("is-hero-reverse-home");
+      suppressCaseScroll = false;
+      return false;
+    }
+    // 结束观察方向用小图的相机方向，这样落地时和小图的姿态完全一致。
+    const endRect = (endDirection && previewApi.modelScreenRect?.(endDirection)) || startRect;
+
+    const previewRect = previewEl.getBoundingClientRect();
+    const originX = startRect.centerX - previewRect.left;
+    const originY = startRect.centerY - previewRect.top;
+    const scale = clamp(dest.height / endRect.height, 0.02, 1);
+    // 以起始模型中心为缩放原点，把「结束姿态下的模型中心」精确映射到小图模型中心。
+    const dx = dest.centerX - startRect.centerX - (endRect.centerX - startRect.centerX) * scale;
+    const dy = dest.centerY - startRect.centerY - (endRect.centerY - startRect.centerY) * scale;
+    const endTransform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+
+    heroTransition = { token, mode: "reverse", view, homeView, animation: null, timer: 0 };
+    previewEl.style.transformOrigin = `${originX}px ${originY}px`;
+    // 定制页背景、顶栏和底部面板一起淡出，让下面的首页透出来；画布保持在最上层。
+    view.classList.add("is-hero-active", "is-hero-reverse");
+
+    previewApi.introSpin?.(HERO_GROW_MS, { endDirection });
+    const animation = previewEl.animate(
+      [
+        { transform: "translate(0px, 0px) scale(1)", offset: 0 },
+        { transform: endTransform, offset: 1 },
+      ],
+      {
+        duration: HERO_GROW_MS,
+        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+        fill: "both",
+      }
+    );
+    heroTransition.animation = animation;
+    const finish = () => finishHeroTransition();
+    animation.onfinish = finish;
+    heroTransition.timer = window.setTimeout(finish, HERO_GROW_MS + 160);
+    return true;
+  } catch (error) {
+    console.warn("定制页 3D 模型退回失败，改为普通切换", error);
+    suppressCaseScroll = false;
+    if (heroTransition && heroTransition.token === token) abortHeroTransition();
+    homeView.classList.remove("is-hero-reverse-home");
+    return false;
+  }
+}
+
+/* 首尾克隆实现无限循环：虚拟顺序为 [末张克隆][真实 1..n][首张克隆]，
+ * 滑到克隆页后立刻无动画跳回对应的真实页，观感上可以一直往同一个方向滑。 */
+function virtualCasePosition() {
+  const track = $("#caseTrack");
+  if (!track) return 0;
+  return track.scrollLeft / Math.max(1, track.clientWidth);
+}
+
+function realCaseIndex(virtualIndex) {
+  const count = HOME_CASES.length;
+  if (count < 2) return 0;
+  if (virtualIndex <= 0) return count - 1;
+  if (virtualIndex >= count + 1) return 0;
+  return clamp(virtualIndex - 1, 0, count - 1);
+}
+
+function nearestVirtualCase() {
+  const count = HOME_CASES.length;
+  if (count < 2) return 0;
+  return clamp(Math.round(virtualCasePosition()), 0, count + 1);
 }
 
 function currentCaseIndex() {
-  const track = $("#caseTrack");
-  if (!track) return activeCaseIndex;
-  return clamp(Math.round(track.scrollLeft / Math.max(1, track.clientWidth)), 0, HOME_CASES.length - 1);
+  return realCaseIndex(nearestVirtualCase());
+}
+
+function virtualCaseForReal(realIndex) {
+  const count = HOME_CASES.length;
+  const target = clamp(realIndex, 0, count - 1);
+  if (count < 2) return 0;
+  const position = virtualCasePosition();
+  // 首尾的真实页各有两个等价位置，选离当前位置最近的那个，避免整排滚回去。
+  const candidates = [target + 1];
+  if (target === 0) candidates.push(count + 1);
+  if (target === count - 1) candidates.push(0);
+  return candidates.reduce(
+    (best, value) => (Math.abs(value - position) < Math.abs(best - position) ? value : best),
+    candidates[0]
+  );
 }
 
 function startWithActiveCase() {
+  if (heroTransition) return;
+  stopCaseAuto();
+  clearTimeout(caseSwipeTimer);
   const index = currentCaseIndex();
   updateCaseProgress(index);
   const item = HOME_CASES[index] || HOME_CASES[0];
   const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
-  startWithStyle(style);
+  // 从小图出发的模型状态必须和首页缩略图完全一致，所以垫高归零。
+  const sourceRect = caseThumbApi?.modelScreenRect?.() || null;
+  state.shimHeight = 0;
+  applyPreset(style);
+  clearTimeout(previewTimer);
+  previewTimer = 0;
+  if (previewApi) previewApi.update({ ...state });
+  if (startHeroTransition(sourceRect)) return;
+  go("customize");
 }
 
 const CASE_FLIP_MS = 480;
@@ -516,6 +779,8 @@ const caseModel = {
 };
 let caseScrollTarget = null;
 let caseScrollTimer = 0;
+let caseSwipeTimer = 0;
+let suppressCaseScroll = false;
 let caseThumbApi = null;
 let caseThumbLoading = false;
 let caseThumbFailed = false;
@@ -554,7 +819,7 @@ async function ensureCaseThumb() {
   caseThumbLoading = true;
   const initialIndex = activeCaseIndex;
   try {
-    const module = await import("./preview.js");
+    const module = await import(PREVIEW_MODULE_URL);
     if (caseThumbApi || caseThumbFailed || currentRoute() !== "home") return;
     const api = module.createPreview(container, casePreviewState(initialIndex), {
       thumbnail: true,
@@ -808,6 +1073,7 @@ function snapToCase(index) {
   const track = $("#caseTrack");
   if (!track) return;
   const target = clamp(index, 0, HOME_CASES.length - 1);
+  const virtual = virtualCaseForReal(target);
   caseScrollTarget = target;
   clearTimeout(caseScrollTimer);
   caseScrollTimer = window.setTimeout(() => {
@@ -816,7 +1082,43 @@ function snapToCase(index) {
   }, CASE_SCROLL_LOCK_MS);
   updateCaseProgress(target);
   setCaseModel(target, { immediate: true });
-  track.scrollTo({ left: target * track.clientWidth, behavior: "smooth" });
+  track.scrollTo({ left: virtual * track.clientWidth, behavior: "smooth" });
+  scheduleCaseNormalize();
+}
+
+function snapToNearestCase() {
+  snapToCase(realCaseIndex(nearestVirtualCase()));
+}
+
+let caseSettleTimer = 0;
+function normalizeCaseScroll() {
+  const track = $("#caseTrack");
+  const count = HOME_CASES.length;
+  if (!track || count < 2) return;
+  const position = virtualCasePosition();
+  const nearest = Math.round(position);
+  if (Math.abs(position - nearest) > 0.02) return;
+  if (nearest <= 0) {
+    // 左侧克隆（末张）→ 真实末张
+    track.scrollLeft = count * track.clientWidth;
+  } else if (nearest >= count + 1) {
+    // 右侧克隆（首张）→ 真实首张
+    track.scrollLeft = track.clientWidth;
+  }
+}
+
+function scheduleCaseNormalize() {
+  clearTimeout(caseSettleTimer);
+  caseSettleTimer = window.setTimeout(normalizeCaseScroll, 160);
+}
+
+function ensureCaseTrackPosition() {
+  const track = $("#caseTrack");
+  if (!track || HOME_CASES.length < 2) return;
+  const width = track.clientWidth;
+  if (!width) return;
+  // 页面隐藏时渲染过，scrollLeft 会停在 0（左侧克隆页），显示后落到真实首张。
+  if (track.scrollLeft < 1) track.scrollLeft = width;
 }
 
 /* ---------- 首页自动轮播 ---------- */
@@ -872,20 +1174,37 @@ function bindCaseEvents() {
   const track = $("#caseTrack");
   if (!track) return;
   track.addEventListener("scroll", () => {
-    const index = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    if (suppressCaseScroll) return;
+    const index = realCaseIndex(Math.round(virtualCasePosition()));
     updateCaseProgress(index);
+    scheduleCaseNormalize();
     if (caseScrollTarget !== null) {
       if (index === caseScrollTarget) clearCaseScrollTarget();
       return;
     }
     setCaseModel(index);
   }, { passive: true });
-  const syncCaseAfterSwipe = () => window.setTimeout(() => {
-    updateCaseProgress(currentCaseIndex());
-    setCaseModel(currentCaseIndex());
-    restartCaseAuto();
-  }, 300);
+  const syncCaseAfterSwipe = () => {
+    clearTimeout(caseSwipeTimer);
+    let attempts = 0;
+    const settle = () => {
+      const position = virtualCasePosition();
+      const nearest = nearestVirtualCase();
+      // 惯性还没停就先等一等，别把「滑到下一张」的动画打断。
+      if (Math.abs(position - nearest) > 0.02 && attempts++ < 20) {
+        caseSwipeTimer = window.setTimeout(settle, 120);
+        return;
+      }
+      normalizeCaseScroll();
+      const index = realCaseIndex(nearest);
+      updateCaseProgress(index);
+      setCaseModel(index);
+      restartCaseAuto();
+    };
+    caseSwipeTimer = window.setTimeout(settle, 260);
+  };
   track.addEventListener("touchstart", () => {
+    clearTimeout(caseSwipeTimer);
     clearCaseScrollTarget();
     pauseCaseAuto();
   }, { passive: true });
@@ -897,6 +1216,7 @@ function bindCaseEvents() {
   let dragStartX = 0;
   let dragStartScroll = 0;
   track.addEventListener("pointerdown", (event) => {
+    clearTimeout(caseSwipeTimer);
     clearCaseScrollTarget();
     pauseCaseAuto();
     if (event.pointerType !== "mouse" || event.button !== 0) return;
@@ -916,7 +1236,7 @@ function bindCaseEvents() {
     if (!dragging) return;
     dragging = false;
     track.classList.remove("is-dragging");
-    if (moved) snapToCase(currentCaseIndex());
+    if (moved) snapToNearestCase();
     restartCaseAuto();
   };
   window.addEventListener("pointerup", endDrag);
@@ -934,13 +1254,25 @@ function bindCaseEvents() {
   $("#homeOrders")?.addEventListener("click", () => go("orders"));
 }
 
+function homeCaseSlides() {
+  const count = HOME_CASES.length;
+  if (count < 2) {
+    return HOME_CASES.map((item, index) => ({ item, realIndex: index, clone: false }));
+  }
+  return [
+    { item: HOME_CASES[count - 1], realIndex: count - 1, clone: true },
+    ...HOME_CASES.map((item, index) => ({ item, realIndex: index, clone: false })),
+    { item: HOME_CASES[0], realIndex: 0, clone: true },
+  ];
+}
+
 function renderHomeCases() {
   const track = $("#caseTrack");
   const progress = $("#caseProgress");
   if (!track || !progress) return;
-  track.innerHTML = HOME_CASES.map((item, index) => {
+  track.innerHTML = homeCaseSlides().map(({ item, realIndex, clone }) => {
     const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
-    return `<article class="case-slide" data-index="${index}">
+    return `<article class="case-slide" data-index="${realIndex}"${clone ? ' data-clone="true" aria-hidden="true"' : ""}>
       <img class="case-image ${item.fit === "cover" ? "is-cover" : ""}" src="${esc(item.image)}" alt="${esc(item.name)}烟机罩案例" draggable="false" />
       <div class="case-shade"></div>
       <div class="case-meta">
@@ -964,6 +1296,8 @@ function renderHomeCases() {
   caseModel.flipTarget = firstSrc;
   caseModel.flipIndex = 0;
   caseModel.button?.setAttribute("aria-label", first ? `查看${first.name}的 3D 模型` : "查看 3D 模型");
+  // 首页隐藏时 clientWidth 为 0，先标记；显示后由 ensureCaseTrackPosition 定位到真实首张。
+  track.scrollLeft = HOME_CASES.length > 1 ? track.clientWidth : 0;
   preloadCaseModels();
   bindCaseEvents();
   updateCaseProgress(0);
@@ -1112,6 +1446,8 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
 }
 
 function schedulePreview() {
+  // 入场衔接期间模型由 introSpin 接管，跳过延迟重建，避免动画中途跳一下。
+  if (heroTransition) return;
   if (previewFailed) {
     const fallback = $("#previewFallback");
     if (fallback) fallback.innerHTML = hoodArt(currentStyle(), { transparent: true });
@@ -1123,20 +1459,25 @@ function schedulePreview() {
   }, 70);
 }
 
-async function ensurePreview() {
-  if (previewApi || previewLoading) return;
-  previewLoading = true;
-  try {
-    const module = await import("./preview.js");
-    previewApi = module.createPreview($("#preview3d"), { ...state });
-  } catch (error) {
-    previewFailed = true;
-    const fallback = $("#previewFallback");
-    if (fallback) fallback.innerHTML = hoodArt(currentStyle(), { transparent: true });
-    $(".view--customize")?.classList.add("is-fallback");
-  } finally {
-    previewLoading = false;
-  }
+function ensurePreview() {
+  if (previewApi) return Promise.resolve(previewApi);
+  if (previewPromise) return previewPromise;
+  previewPromise = (async () => {
+    try {
+      const module = await import(PREVIEW_MODULE_URL);
+      if (!previewApi) previewApi = module.createPreview($("#preview3d"), { ...state });
+      return previewApi;
+    } catch (error) {
+      previewFailed = true;
+      const fallback = $("#previewFallback");
+      if (fallback) fallback.innerHTML = hoodArt(currentStyle(), { transparent: true });
+      $(".view--customize")?.classList.add("is-fallback");
+      return null;
+    } finally {
+      previewPromise = null;
+    }
+  })();
+  return previewPromise;
 }
 
 /* ---------- 路由 ---------- */
@@ -1158,15 +1499,40 @@ function go(route, { replace = false } = {}) {
     location.hash = hash;
   }
 }
+
+// 同步切路由：入场衔接需要在同一帧内完成「隐藏首页 + 显示定制页 + 摆好首帧」。
+function goNow(route) {
+  const hash = route === "home" ? "#/" : `#/${route}`;
+  if (location.hash === hash) {
+    renderRoute();
+    return;
+  }
+  history.pushState(null, "", hash);
+  renderRoute();
+}
 function backTarget() {
   return ({ orders: "home", order: "orders", customize: "home", install: "customize" })[currentRoute()] || "home";
 }
 
 function renderRoute() {
   const route = currentRoute();
+  // 定制页 → 首页：先播放主模型缩回小图的动画，动画结束再真正切换视图。
+  if (route === "home" && lastRenderedRoute === "customize" && !heroTransition && startReverseHero()) return;
+  applyRoute(route);
+}
+
+function applyRoute(route) {
+  if (route !== "customize") {
+    abortHeroTransition();
+    $(".view--customize")?.classList.remove("no-view-in", "is-hero-measuring", "is-hero-entering", "is-hero-active", "is-hero-reverse");
+  }
+  if (route !== "home") {
+    $('.view[data-view="home"]')?.classList.remove("no-view-in", "is-hero-reverse-home");
+  }
   $$(".view").forEach((view) => view.classList.toggle("is-active", view.dataset.view === route));
   closeSheet();
   if (route === "home") {
+    ensureCaseTrackPosition();
     restartCaseAuto();
     scheduleCaseThumb();
   } else {
@@ -1189,6 +1555,7 @@ function renderRoute() {
     renderInstallTabs();
     setInstallStep(activeInstallKey, true);
   }
+  lastRenderedRoute = route;
   window.scrollTo(0, 0);
 }
 
@@ -1347,7 +1714,8 @@ function sumRow(label, value) {
 
 function renderCheckoutSummary() {
   const summary = $("#orderSummary");
-  if (!summary) return;
+  const fees = $("#orderFees");
+  if (!summary && !fees) return;
   const style = currentStyle();
   const price = priceInfo();
   const start = startLabelFor(state.surfaceType, state.surfaceStart);
@@ -1356,18 +1724,24 @@ function renderCheckoutSummary() {
     : state.surfaceType === "flat"
       ? `不弯曲 · ${start}`
       : `${state.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
-  summary.innerHTML = [
-    sumRow("款式", `${style.name} · ${style.tone}`),
-    sumRow("下横", `${state.hoodWidth} × ${state.hoodDepth}mm`),
-    sumRow("侧高", `靠墙 ${state.rearHeight} / 前侧 ${state.frontHeight}mm`),
-    sumRow("上竖", `${state.chimneyWidth} × ${state.chimneyDepth} × ${state.chimneyHeight}mm`),
-    sumRow("侧面", curveLabel),
-    sumRow("装饰条", trimSummaryShort(state)),
-    sumRow("垫高", `${state.shimHeight}mm`),
-    sumRow("主体", fmt(CONFIG.basePrice)),
-    sumRow("装饰", fmt(price.trim)),
-    `<div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>`,
-  ].join("");
+  if (summary) {
+    summary.innerHTML = [
+      sumRow("款式", `${style.name} · ${style.tone}`),
+      sumRow("下横", `${state.hoodWidth} × ${state.hoodDepth}mm`),
+      sumRow("侧高", `靠墙 ${state.rearHeight} / 前侧 ${state.frontHeight}mm`),
+      sumRow("上竖", `${state.chimneyWidth} × ${state.chimneyDepth} × ${state.chimneyHeight}mm`),
+      sumRow("侧面", curveLabel),
+      sumRow("装饰条", trimSummaryShort(state)),
+      sumRow("垫高", `${state.shimHeight}mm`),
+    ].join("");
+  }
+  if (fees) {
+    fees.innerHTML = [
+      sumRow("主体", fmt(CONFIG.basePrice)),
+      sumRow("装饰", fmt(price.trim)),
+      `<div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>`,
+    ].join("");
+  }
 }
 
 function renderCheckout() {
@@ -1736,7 +2110,7 @@ async function mountOrderPreview(config) {
   if (!stage) return;
   const token = ++orderPreviewToken;
   try {
-    const module = await import("./preview.js");
+    const module = await import(PREVIEW_MODULE_URL);
     if (token !== orderPreviewToken || !stage.isConnected || currentRoute() !== "order") return;
     stage.innerHTML = "";
     orderPreviewApi = module.createPreview(stage, config, {
@@ -2013,6 +2387,11 @@ function orderCheckoutHtml() {
       <div class="order-card">
         <div class="order-card-head"><h2>定制清单</h2><button type="button" id="editConfig" class="link-btn">修改</button></div>
         <div id="orderSummary"></div>
+      </div>
+
+      <div class="order-card">
+        <div class="order-card-head"><h2>费用明细</h2></div>
+        <div id="orderFees"></div>
         <div class="order-total">
           <span>合计</span>
           <div class="order-total-prices">

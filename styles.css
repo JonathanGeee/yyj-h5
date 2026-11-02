@@ -670,7 +670,6 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   width: 100%;
   max-width: 480px;
   padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(226, 214, 197, 0.85);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 -12px 30px rgba(74, 55, 31, 0.06);
   -webkit-backdrop-filter: blur(18px);
@@ -1160,7 +1159,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   z-index: 2;
   display: flex;
   gap: 5px;
-  padding: 2px 0 10px;
+  padding: 2px 0 18px;
   background: var(--paper);
 }
 .order-steps button {
@@ -1585,6 +1584,87 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .view--customize.is-fallback .stage-canvas { display: none; }
 .view--customize.is-fallback .stage-fallback { display: grid; }
 
+/* 首页 3D 小图 → 定制页主模型：小模型转到定制页的位置并放大。
+ * is-hero-measuring：保持最终布局但藏在屏幕外，用来量模型落点。
+ * is-hero-active：动画期间把画布抬到面板之上，放大过程不被底部面板裁住。 */
+.view--customize.is-hero-measuring,
+.view--customize.is-hero-entering,
+.view--customize.is-hero-active,
+.view--customize.no-view-in {
+  animation: none;
+}
+.view--customize.is-hero-measuring {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  visibility: hidden;
+  pointer-events: none;
+}
+.view--customize.is-hero-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+.view--customize.is-hero-active .stage-canvas {
+  z-index: 7;
+  will-change: transform;
+  pointer-events: none;
+}
+.view--customize.is-hero-active .stage-bar {
+  z-index: 8;
+}
+.view--customize.is-hero-entering .stage-bar,
+.view--customize.is-hero-entering .custom-sheet {
+  opacity: 0;
+  transform: translateY(18px);
+  pointer-events: none;
+}
+.view--customize.is-hero-active .stage-bar,
+.view--customize.is-hero-active .custom-sheet {
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+  transition:
+    opacity 0.4s ease 0.2s,
+    transform 0.56s cubic-bezier(0.22, 0.72, 0.2, 1) 0.18s;
+}
+
+/* 定制页 → 首页：首页完整铺在下面，定制页背景、顶栏和面板淡出，
+ * 主模型缩回小图。动画结束同一帧换回首页，观感上就是模型直接落回小图。 */
+.view[data-view="home"].is-hero-reverse-home,
+.view[data-view="home"].no-view-in {
+  animation: none;
+}
+.view[data-view="home"].is-hero-reverse-home {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  visibility: visible;
+  pointer-events: none;
+}
+.view--customize.is-hero-reverse {
+  background: transparent;
+  transition: background-color 0.3s ease;
+}
+.view--customize.is-hero-reverse .stage {
+  background: transparent;
+  transition: background-color 0.3s ease;
+}
+.view--customize.is-hero-reverse .stage-bar,
+.view--customize.is-hero-reverse .custom-sheet {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
 .stage-bar {
   position: absolute;
   top: 0;
@@ -1750,7 +1830,6 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   align-items: center;
   gap: 0;
   padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
-  border-top: 1px solid #f0f0f0;
   background: #ffffff;
 }
 .custom-buybar .buybar-price { flex: 1; min-width: 0; line-height: 1.1; }

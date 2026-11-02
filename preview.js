@@ -41,6 +41,8 @@ export function createPreview(container, initialState, options = {}) {
   let spinRaf = 0;
   let spinToken = 0;
   let spinFallbackTimer = 0;
+  let introRaf = 0;
+  let introToken = 0;
   let thumbMorph = null;
   const flashItems = [];
   const dimMaterials = new Map();
@@ -632,6 +634,121 @@ export function createPreview(container, initialState, options = {}) {
     return box.isEmpty() ? null : box;
   }
 
+  // 模型当前在屏幕上的包围盒（视口坐标）。首页小图 ↔ 定制页的衔接动画用它对齐两者。
+  // 传入 direction 时，按该观察方向用同样的相机距离临时投影，用于计算反向动画结束时的尺寸。
+  function modelScreenRect(direction) {
+    if (!model || !camera || !renderer) return null;
+    const box = currentBox();
+    if (!box) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    let viewCamera = camera;
+    if (Array.isArray(direction) && direction.length >= 3) {
+      const dir = new THREE.Vector3(...direction);
+      if (dir.lengthSq() < 1e-8) return null;
+      const target = controls.target.clone();
+      const radius = camera.position.distanceTo(target);
+      viewCamera = camera.clone();
+      viewCamera.position.copy(target).addScaledVector(dir.normalize(), radius);
+      viewCamera.lookAt(target);
+      viewCamera.updateMatrixWorld();
+      viewCamera.matrixWorldInverse.copy(viewCamera.matrixWorld).invert();
+    } else {
+      camera.updateMatrixWorld();
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    }
+    const point = new THREE.Vector3();
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let ix = 0; ix < 2; ix += 1) {
+      for (let iy = 0; iy < 2; iy += 1) {
+        for (let iz = 0; iz < 2; iz += 1) {
+          point
+            .set(ix ? box.max.x : box.min.x, iy ? box.max.y : box.min.y, iz ? box.max.z : box.min.z)
+            .project(viewCamera);
+          const x = rect.left + (point.x * 0.5 + 0.5) * rect.width;
+          const y = rect.top + (-point.y * 0.5 + 0.5) * rect.height;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    return {
+      left: minX,
+      top: minY,
+      right: maxX,
+      bottom: maxY,
+      width: maxX - minX,
+      height: maxY - minY,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+    };
+  }
+
+  function getViewDirection() {
+    if (!camera || !controls) return null;
+    const direction = camera.position.clone().sub(controls.target);
+    if (direction.lengthSq() < 1e-8) return null;
+    return direction.normalize().toArray();
+  }
+
+  function cancelIntroSpin() {
+    introToken += 1;
+    if (introRaf) cancelAnimationFrame(introRaf);
+    introRaf = 0;
+  }
+
+  // 入场/退场旋转：相机绕模型转一整圈；传 endDirection 时最后精确落到指定观察方向，
+  // 配合页面上的放大/缩小动画，就是小图和定制页主模型之间的“转起来长大 / 缩回去”。
+  function introSpin(duration = 880, options = {}) {
+    if (disposed || !camera || !controls || !model) return;
+    cancelIntroSpin();
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    clearFocus();
+    const target = controls.target.clone();
+    const offset = camera.position.clone().sub(target);
+    const startSph = new THREE.Spherical().setFromVector3(offset);
+    if (startSph.radius < 1e-3) return;
+    const endSph = startSph.clone();
+    if (Array.isArray(options.endDirection) && options.endDirection.length >= 3) {
+      const direction = new THREE.Vector3(...options.endDirection);
+      if (direction.lengthSq() > 1e-8) {
+        direction.normalize();
+        endSph.phi = Math.acos(clamp(direction.y, -1, 1));
+        endSph.theta = Math.atan2(direction.x, direction.z);
+      }
+    }
+    let deltaTheta = endSph.theta - startSph.theta;
+    while (deltaTheta > Math.PI) deltaTheta -= Math.PI * 2;
+    while (deltaTheta < -Math.PI) deltaTheta += Math.PI * 2;
+    // 始终至少转满一圈，再顺带对齐到结束方向。
+    deltaTheta += Math.PI * 2;
+    const startPhi = startSph.phi;
+    const endPhi = endSph.phi;
+    const start = performance.now();
+    const token = ++introToken;
+    const step = () => {
+      if (token !== introToken || disposed) return;
+      const t = Math.min(1, (performance.now() - start) / duration);
+      const phi = startPhi + (endPhi - startPhi) * t;
+      const theta = startSph.theta + deltaTheta * t;
+      camera.position.setFromSphericalCoords(startSph.radius, phi, theta).add(target);
+      camera.lookAt(target);
+      controls.update();
+      renderer.render(scene, camera);
+      if (t < 1) {
+        introRaf = requestAnimationFrame(step);
+      } else {
+        introRaf = 0;
+      }
+    };
+    introRaf = requestAnimationFrame(step);
+  }
+
   function distanceFor(box) {
     const size = box.getSize(new THREE.Vector3());
     const aspect = Math.max(0.2, camera.aspect || 1);
@@ -832,6 +949,7 @@ export function createPreview(container, initialState, options = {}) {
   }
 
   function focusView(name, hold = 2000) {
+    cancelIntroSpin();
     const preset = viewPreset(name);
     if (!preset) return;
     if (!savedView) {
@@ -1054,6 +1172,7 @@ export function createPreview(container, initialState, options = {}) {
   }
 
   function update(nextState) {
+    cancelIntroSpin();
     const viewDirection = camera.position.clone().sub(controls.target).normalize();
     rebuildModelState(nextState);
     if (!model) return;
@@ -1337,6 +1456,7 @@ export function createPreview(container, initialState, options = {}) {
 
   function dispose() {
     disposed = true;
+    cancelIntroSpin();
     if (spinRaf) cancelAnimationFrame(spinRaf);
     spinRaf = 0;
     clearTimeout(spinFallbackTimer);
@@ -1410,6 +1530,7 @@ export function createPreview(container, initialState, options = {}) {
   controls.minPolarAngle = 0.1;
   controls.maxPolarAngle = Math.PI - 0.1;
   controls.addEventListener("start", () => {
+    cancelIntroSpin();
     controls.autoRotate = false;
     if (savedView) clearFocus();
   });
@@ -1452,6 +1573,7 @@ export function createPreview(container, initialState, options = {}) {
   return {
     update,
     spinToState,
+    introSpin,
     resetView,
     focusView,
     highlightPart,
@@ -1459,6 +1581,10 @@ export function createPreview(container, initialState, options = {}) {
     cameraPath,
     cameraOverview,
     overviewView,
+    modelScreenRect,
+    getViewDirection,
+    resizeNow: resize,
+    stopIntroSpin: cancelIntroSpin,
     setModelOpacity,
     dispose,
     snapshot,

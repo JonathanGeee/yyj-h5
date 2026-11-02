@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { createPreview } from "./preview.js";
+// 与 app.js 的 PREVIEW_MODULE_URL 保持一致，避免同一个模块被加载两份。
+import { createPreview } from "./preview.js?v=20261103-3";
 
 /* 安装说明 · 复用定制页的实体模型
  * 第 1 步拆开 7 块主体板，第 2 步装 3 块曲面装饰，
