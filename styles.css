@@ -595,7 +595,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   text-align: center;
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.notch-option svg { width: 100%; height: 24px; flex: none; }
+.notch-option svg { width: 100%; height: 21px; flex: none; }
 .notch-option b { margin-top: 2px; font-size: 9.5px; font-weight: 600; white-space: nowrap; }
 .notch-option.is-active {
   color: var(--green);
@@ -1577,7 +1577,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   overflow: hidden;
   border-radius: 24px 24px 0 0;
   background: #ffffff;
-  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.07);
+  box-shadow: none;
 }
 .custom-sheet-head {
   flex: none;
@@ -1657,7 +1657,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
   padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
   border-top: 1px solid #f0f0f0;
   background: #ffffff;
@@ -1673,7 +1673,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   height: 50px;
   padding: 0 18px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 999px 0 0 999px;
   color: var(--green);
   background: var(--green-soft);
   font-size: 15.5px;
@@ -1683,7 +1683,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 }
 .bar-link { padding: 1px 0; border: 0; color: var(--green); background: transparent; font-size: 10px; font-weight: 600; line-height: 1.5; }
 .bar-link.danger { color: var(--danger); }
-.custom-buybar .btn-buy { flex: 1; min-width: 0; height: 50px; padding: 0 16px; font-size: 15.5px; font-weight: 700; letter-spacing: 0.02em; }
+.custom-buybar .btn-buy { flex: 1; min-width: 0; height: 50px; padding: 0 16px; border-radius: 0 999px 999px 0; font-size: 15.5px; font-weight: 700; letter-spacing: 0.02em; }
 
 .trim-list { border-top: 1px solid #eceee9; }
 .trim-row {

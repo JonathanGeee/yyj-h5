@@ -971,7 +971,7 @@ function renderHomeCases() {
 function dimRow(key) {
   const dim = DIMS[key];
   return `<div class="dim-row" data-dim="${key}">
-    <div class="dim-label"><b>${dim.label}</b>${dim.hint ? `<span>${dim.hint}</span>` : ""}</div>
+    <div class="dim-label"><b>${dim.label}</b></div>
     <div class="stepper">
       <button type="button" data-step="-${dim.step}" aria-label="减少${dim.label}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
       <input type="number" inputmode="numeric" min="${dim.min}" max="${dim.max}" step="1" value="${state[key]}" aria-label="${dim.label}" />
@@ -1020,7 +1020,7 @@ function renderTrimList() {
   list.innerHTML = activeTrimPositions().map((position) => {
     const trim = trimFor(position.key);
     return `<button class="trim-row" type="button" data-trim-position="${position.key}">
-      <span class="trim-row-main"><b class="trim-row-name">${position.name}</b><span class="trim-row-hint">${position.hint}</span></span>
+      <span class="trim-row-main"><b class="trim-row-name">${position.name}</b></span>
       <span class="trim-row-current">${trim.name}</span>
       <span class="trim-row-price">${trim.price ? fmt(trim.price) : "免费"}</span>
       <svg class="trim-row-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m8 5 5 5-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1077,7 +1077,6 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   $$("#notchOptions .notch-option").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.notch === state.notchShape);
   });
-  if ($("#notchHint")) $("#notchHint").hidden = state.notchEnabled !== false;
   const noSide = state.surfaceType === "none";
   if ($("#startLabel")) $("#startLabel").hidden = noSide;
   if ($("#startOptions")) $("#startOptions").hidden = noSide;
@@ -1090,11 +1089,6 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   $$("#startOptions button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.start === state.surfaceStart);
   });
-  if ($("#startHint")) {
-    const convex = state.surfaceType === "convex";
-    $("#startHint").hidden = !convex;
-    $("#startHint").textContent = convex ? "位置越靠下，向外鼓出的位置越靠近下横。" : "";
-  }
 
   renderTrimList();
 
