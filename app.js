@@ -3,7 +3,7 @@
  */
 const CONFIG = {
   basePrice: 700,
-  trimPrices: { none: 0, single: 30, double: 50, corner: 40 },
+  trimPrices: { none: 0, single: 30, corner: 40 },
   wechatId: "Jonathan_Ge",
   qrImage: "assets/pay-qr.jpg",
   serviceQrImage: "assets/service-qr.jpg",
@@ -17,7 +17,7 @@ const STYLES = [
     id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 双层收边",
     curve: "concave", start: "middle",
     dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 400, chimneyDepth: 320, chimneyHeight: 760 },
-    trims: { top: "corner", start: "double", hoodTop: "corner", hoodBottom: "single" },
+    trims: { top: "corner", start: "single", hoodTop: "corner", hoodBottom: "single" },
     notch: { shape: "arch", width: 300, height: 60, offset: 0 },
   },
   {
@@ -109,8 +109,7 @@ async function loadSiteContent() {
 
 const TRIMS = [
   { id: "none", name: "无装饰条", desc: "干净利落", price: 0 },
-  { id: "single", name: "单眼皮", desc: "半圆细边", price: 30 },
-  { id: "double", name: "双眼皮", desc: "双线层次", price: 50 },
+  { id: "single", name: "半圆线条", desc: "半圆细边", price: 30 },
   { id: "corner", name: "顶角条", desc: "直角收边", price: 40 },
 ];
 
@@ -159,7 +158,7 @@ const DEFAULTS = {
   chimneyWidth: 320, chimneyDepth: 280, chimneyHeight: 500,
   shimHeight: 0, surfaceType: "concave", surfaceStart: "middle",
   notchEnabled: true, notchShape: "arch", notchWidth: 420, notchHeight: 80, notchOffset: 0,
-  trimStyles: { top: "corner", start: "double", hoodTop: "single", hoodBottom: "single" },
+  trimStyles: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
 };
 
 const CURVES = [
@@ -1021,7 +1020,6 @@ function renderTrimList() {
   list.innerHTML = activeTrimPositions().map((position) => {
     const trim = trimFor(position.key);
     return `<button class="trim-row" type="button" data-trim-position="${position.key}">
-      <span class="trim-row-icon">${trimArt(trim.id)}</span>
       <span class="trim-row-main"><b class="trim-row-name">${position.name}</b><span class="trim-row-hint">${position.hint}</span></span>
       <span class="trim-row-current">${trim.name}</span>
       <span class="trim-row-price">${trim.price ? fmt(trim.price) : "免费"}</span>
@@ -2437,6 +2435,15 @@ async function init() {
   syncUI({ writeInputs: true });
   renderRoute();
   flushPending();
+
+  // 定制页是整屏沉浸式布局：除底部面板和弹层外，拖拽不再带动页面滚动 / 回弹。
+  document.addEventListener("touchmove", (event) => {
+    if (currentRoute() !== "customize") return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(".custom-panels, .sheet")) return;
+    if (event.cancelable) event.preventDefault();
+  }, { passive: false });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stopCaseAuto();

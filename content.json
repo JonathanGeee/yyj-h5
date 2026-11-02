@@ -6,7 +6,6 @@
   "trimPrices": {
     "none": 0,
     "single": 30,
-    "double": 50,
     "corner": 40
   },
   "cases": [
