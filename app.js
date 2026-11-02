@@ -16,43 +16,43 @@ const STYLES = [
   {
     id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 双层收边",
     curve: "concave", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 400, chimneyDepth: 320, chimneyHeight: 760 },
+    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 390, frontHeight: 255, chimneyWidth: 500, chimneyDepth: 330, chimneyHeight: 680 },
     trims: { top: "corner", start: "single", hoodTop: "corner", hoodBottom: "single" },
-    notch: { shape: "arch", width: 300, height: 60, offset: 0 },
+    notch: { shape: "rounded", width: 300, height: 60, offset: 0 },
   },
   {
     id: "tall", name: "高窄弧", tone: "暖米", desc: "窄身长弧 · 顶部起弧",
     curve: "concave", start: "top",
-    dims: { hoodWidth: 780, hoodDepth: 470, rearHeight: 470, frontHeight: 300, chimneyWidth: 260, chimneyDepth: 280, chimneyHeight: 980 },
+    dims: { hoodWidth: 800, hoodDepth: 470, rearHeight: 380, frontHeight: 260, chimneyWidth: 280, chimneyDepth: 300, chimneyHeight: 500 },
     trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 320, height: 70, offset: 0 },
+    notch: { shape: "arch", width: 340, height: 90, offset: 0 },
   },
   {
     id: "line", name: "直边塔", tone: "暖米", desc: "直边收分 · 单线压顶",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 920, hoodDepth: 500, rearHeight: 410, frontHeight: 260, chimneyWidth: 360, chimneyDepth: 310, chimneyHeight: 660 },
+    dims: { hoodWidth: 940, hoodDepth: 500, rearHeight: 330, frontHeight: 220, chimneyWidth: 480, chimneyDepth: 330, chimneyHeight: 620 },
     trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 360, height: 60, offset: 0 },
+    notch: { shape: "trapezoid", width: 340, height: 60, offset: 0 },
   },
   {
     id: "arch", name: "圆顶拱", tone: "暖米", desc: "圆顶外凸 · 大弧口",
-    curve: "convex", start: "lowest",
-    dims: { hoodWidth: 1080, hoodDepth: 530, rearHeight: 380, frontHeight: 280, chimneyWidth: 440, chimneyDepth: 340, chimneyHeight: 420 },
-    trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 600, height: 150, offset: 0 },
+    curve: "concave", start: "top",
+    dims: { hoodWidth: 840, hoodDepth: 480, rearHeight: 400, frontHeight: 280, chimneyWidth: 300, chimneyDepth: 310, chimneyHeight: 520 },
+    trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
+    notch: { shape: "arch", width: 460, height: 120, offset: 0 },
   },
   {
     id: "crown", name: "宽方冠", tone: "暖米", desc: "宽肩方冠 · 台阶压顶",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 1060, hoodDepth: 520, rearHeight: 360, frontHeight: 240, chimneyWidth: 600, chimneyDepth: 400, chimneyHeight: 560 },
-    trims: { top: "single", start: "none", hoodTop: "corner", hoodBottom: "single" },
-    notch: { shape: "arch", width: 520, height: 150, offset: 0 },
+    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 440, chimneyDepth: 330, chimneyHeight: 560 },
+    trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
+    notch: { shape: "trapezoid", width: 320, height: 90, offset: 0 },
   },
   {
     id: "float", name: "极简方盒", tone: "暖米", desc: "无侧面 · 干净直边",
     curve: "none", start: "middle",
-    dims: { hoodWidth: 1080, hoodDepth: 520, rearHeight: 320, frontHeight: 220, chimneyWidth: 600, chimneyDepth: 390, chimneyHeight: 580 },
-    trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
+    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 300, frontHeight: 220, chimneyWidth: 620, chimneyDepth: 380, chimneyHeight: 680 },
+    trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
     notch: { enabled: false, shape: "rect", width: 260, height: 50, offset: 90 },
   },
 ];
@@ -60,12 +60,12 @@ const STYLES = [
 // 首页案例：大图先用原来的 3D 渲染占位，之后换成 AI 实景图。
 // model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
 const HOME_CASES = [
-  { styleId: "cloud", name: "法式云朵弧", image: "assets/styles/cloud.png", model: "assets/models/cloud.png", fit: "contain" },
-  { styleId: "tall", name: "法式高窄弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
-  { styleId: "line", name: "法式直边塔", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
-  { styleId: "arch", name: "法式圆顶拱", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
-  { styleId: "crown", name: "法式宽方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
-  { styleId: "float", name: "法式极简方盒", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
+  { styleId: "cloud", name: "法式云朵弧", image: "assets/styles/cloud.jpg", model: "assets/models/cloud.png", fit: "cover" },
+  { styleId: "line", name: "法式直边塔", image: "assets/styles/line.jpg", model: "assets/models/line.png", fit: "cover" },
+  { styleId: "tall", name: "法式高窄弧", image: "assets/styles/tall.jpg", model: "assets/models/tall.png", fit: "cover" },
+  { styleId: "arch", name: "法式圆顶拱", image: "assets/styles/arch.jpg", model: "assets/models/arch.png", fit: "cover" },
+  { styleId: "crown", name: "法式宽方冠", image: "assets/styles/crown.jpg", model: "assets/models/crown.png", fit: "cover" },
+  { styleId: "float", name: "法式极简方盒", image: "assets/styles/float.jpg", model: "assets/models/float.png", fit: "cover" },
 ];
 // 3D 小图的全局兜底；每个案例自己的 model 优先。
 let HOME_3D_IMAGE = "";
