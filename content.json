@@ -1,6 +1,7 @@
 {
-  "wechatId": "yanzhaolab",
-  "qrImage": "assets/wechat-qr.svg",
+  "wechatId": "Jonathan_Ge",
+  "qrImage": "assets/pay-qr.jpg",
+  "serviceQrImage": "assets/service-qr.jpg",
   "basePrice": 700,
   "trimPrices": {
     "none": 0,
@@ -18,44 +19,37 @@
     },
     {
       "styleId": "tall",
-      "name": "高弧",
+      "name": "高窄弧",
       "image": "assets/styles/tall.png",
       "model": "assets/models/tall.png",
       "fit": "contain"
     },
     {
       "styleId": "line",
-      "name": "直边梯形",
+      "name": "直边塔",
       "image": "assets/styles/line.png",
       "model": "assets/models/line.png",
       "fit": "contain"
     },
     {
       "styleId": "arch",
-      "name": "微拱门",
+      "name": "圆顶拱",
       "image": "assets/styles/arch.png",
       "model": "assets/models/arch.png",
       "fit": "contain"
     },
     {
-      "styleId": "retro",
-      "name": "海棠边",
-      "image": "assets/styles/retro.png",
-      "model": "assets/models/retro.png",
+      "styleId": "crown",
+      "name": "宽方冠",
+      "image": "assets/styles/crown.png",
+      "model": "assets/models/crown.png",
       "fit": "contain"
     },
     {
       "styleId": "float",
-      "name": "悬浮边",
+      "name": "极简方盒",
       "image": "assets/styles/float.png",
       "model": "assets/models/float.png",
-      "fit": "contain"
-    },
-    {
-      "styleId": "crown",
-      "name": "方冠",
-      "image": "assets/styles/crown.png",
-      "model": "assets/models/crown.png",
       "fit": "contain"
     }
   ]

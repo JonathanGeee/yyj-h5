@@ -4,8 +4,9 @@
 const CONFIG = {
   basePrice: 700,
   trimPrices: { none: 0, single: 30, double: 50, corner: 40 },
-  wechatId: "yanzhaolab",
-  qrImage: "assets/wechat-qr.svg",
+  wechatId: "Jonathan_Ge",
+  qrImage: "assets/pay-qr.jpg",
+  serviceQrImage: "assets/service-qr.jpg",
   orderEndpoint: location.hostname.endsWith("github.io")
     ? "https://yyj-h5-d5gaovp196680d93f-1258663924.ap-shanghai.app.tcloudbase.com/api/orders"
     : "/api/orders",
@@ -13,53 +14,46 @@ const CONFIG = {
 
 const STYLES = [
   {
-    id: "cloud", name: "云朵弧", tone: "暖米", desc: "向内微凹 · 矩形口",
+    id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 双层收边",
     curve: "concave", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 420, chimneyDepth: 330, chimneyHeight: 720 },
-    trims: { top: "corner", start: "single", hoodTop: "double", hoodBottom: "single" },
-    notch: { shape: "rect", width: 320, height: 60, offset: 0 },
+    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 400, chimneyDepth: 320, chimneyHeight: 760 },
+    trims: { top: "corner", start: "double", hoodTop: "corner", hoodBottom: "single" },
+    notch: { shape: "arch", width: 300, height: 60, offset: 0 },
   },
   {
-    id: "tall", name: "高弧", tone: "暖米", desc: "窄身长弧 · 矩形口",
+    id: "tall", name: "高窄弧", tone: "暖米", desc: "窄身长弧 · 顶部起弧",
     curve: "concave", start: "top",
-    dims: { hoodWidth: 820, hoodDepth: 480, rearHeight: 430, frontHeight: 280, chimneyWidth: 260, chimneyDepth: 280, chimneyHeight: 920 },
-    trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "rect", width: 300, height: 55, offset: 0 },
+    dims: { hoodWidth: 780, hoodDepth: 470, rearHeight: 470, frontHeight: 300, chimneyWidth: 260, chimneyDepth: 280, chimneyHeight: 980 },
+    trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
+    notch: { shape: "arch", width: 320, height: 70, offset: 0 },
   },
   {
-    id: "line", name: "直边梯形", tone: "暖米", desc: "直边梯形 · 细弧口",
+    id: "line", name: "直边塔", tone: "暖米", desc: "直边收分 · 单线压顶",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 900, hoodDepth: 480, rearHeight: 380, frontHeight: 250, chimneyWidth: 380, chimneyDepth: 300, chimneyHeight: 620 },
+    dims: { hoodWidth: 920, hoodDepth: 500, rearHeight: 410, frontHeight: 260, chimneyWidth: 360, chimneyDepth: 310, chimneyHeight: 660 },
     trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 380, height: 60, offset: 0 },
+    notch: { shape: "arch", width: 360, height: 60, offset: 0 },
   },
   {
-    id: "arch", name: "微拱门", tone: "暖米", desc: "圆顶外凸 · 大弧口",
-    curve: "convex", start: "lower",
-    dims: { hoodWidth: 1060, hoodDepth: 520, rearHeight: 360, frontHeight: 250, chimneyWidth: 400, chimneyDepth: 320, chimneyHeight: 460 },
+    id: "arch", name: "圆顶拱", tone: "暖米", desc: "圆顶外凸 · 大弧口",
+    curve: "convex", start: "lowest",
+    dims: { hoodWidth: 1080, hoodDepth: 530, rearHeight: 380, frontHeight: 280, chimneyWidth: 440, chimneyDepth: 340, chimneyHeight: 420 },
     trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 560, height: 160, offset: 0 },
+    notch: { shape: "arch", width: 600, height: 150, offset: 0 },
   },
   {
-    id: "retro", name: "海棠边", tone: "暖米", desc: "内凹曲面 · 圆角口",
-    curve: "concave", start: "middle",
-    dims: { hoodWidth: 920, hoodDepth: 500, rearHeight: 440, frontHeight: 290, chimneyWidth: 320, chimneyDepth: 300, chimneyHeight: 760 },
-    trims: { top: "corner", start: "double", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "rounded", width: 200, height: 80, offset: 0 },
-  },
-  {
-    id: "float", name: "悬浮边", tone: "暖米", desc: "方块直边 · 偏置方口",
+    id: "crown", name: "宽方冠", tone: "暖米", desc: "宽肩方冠 · 台阶压顶",
     curve: "flat", start: "middle",
-    dims: { hoodWidth: 1080, hoodDepth: 520, rearHeight: 280, frontHeight: 200, chimneyWidth: 700, chimneyDepth: 400, chimneyHeight: 420 },
-    trims: { top: "none", start: "none", hoodTop: "none", hoodBottom: "none" },
-    notch: { shape: "rect", width: 260, height: 55, offset: 90 },
-  },
-  {
-    id: "crown", name: "方冠", tone: "暖米", desc: "方块 · 大弧口",
-    curve: "flat", start: "middle",
-    dims: { hoodWidth: 1080, hoodDepth: 530, rearHeight: 340, frontHeight: 230, chimneyWidth: 760, chimneyDepth: 420, chimneyHeight: 560 },
-    trims: { top: "corner", start: "none", hoodTop: "double", hoodBottom: "single" },
+    dims: { hoodWidth: 1060, hoodDepth: 520, rearHeight: 360, frontHeight: 240, chimneyWidth: 600, chimneyDepth: 400, chimneyHeight: 560 },
+    trims: { top: "single", start: "none", hoodTop: "corner", hoodBottom: "single" },
     notch: { shape: "arch", width: 520, height: 150, offset: 0 },
+  },
+  {
+    id: "float", name: "极简方盒", tone: "暖米", desc: "无侧面 · 干净直边",
+    curve: "none", start: "middle",
+    dims: { hoodWidth: 1080, hoodDepth: 520, rearHeight: 320, frontHeight: 220, chimneyWidth: 600, chimneyDepth: 390, chimneyHeight: 580 },
+    trims: { top: "none", start: "none", hoodTop: "single", hoodBottom: "single" },
+    notch: { enabled: false, shape: "rect", width: 260, height: 50, offset: 90 },
   },
 ];
 
@@ -67,12 +61,11 @@ const STYLES = [
 // model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
 const HOME_CASES = [
   { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.png", model: "assets/models/cloud.png", fit: "contain" },
-  { styleId: "tall", name: "高弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
-  { styleId: "line", name: "直边梯形", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
-  { styleId: "arch", name: "微拱门", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
-  { styleId: "retro", name: "海棠边", image: "assets/styles/retro.png", model: "assets/models/retro.png", fit: "contain" },
-  { styleId: "float", name: "悬浮边", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
-  { styleId: "crown", name: "方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
+  { styleId: "tall", name: "高窄弧", image: "assets/styles/tall.png", model: "assets/models/tall.png", fit: "contain" },
+  { styleId: "line", name: "直边塔", image: "assets/styles/line.png", model: "assets/models/line.png", fit: "contain" },
+  { styleId: "arch", name: "圆顶拱", image: "assets/styles/arch.png", model: "assets/models/arch.png", fit: "contain" },
+  { styleId: "crown", name: "宽方冠", image: "assets/styles/crown.png", model: "assets/models/crown.png", fit: "contain" },
+  { styleId: "float", name: "极简方盒", image: "assets/styles/float.png", model: "assets/models/float.png", fit: "contain" },
 ];
 // 3D 小图的全局兜底；每个案例自己的 model 优先。
 let HOME_3D_IMAGE = "";
@@ -88,6 +81,7 @@ async function loadSiteContent() {
     const data = await response.json();
     if (data && data.wechatId) CONFIG.wechatId = String(data.wechatId);
     if (data && data.qrImage) CONFIG.qrImage = String(data.qrImage);
+    if (data && data.serviceQrImage) CONFIG.serviceQrImage = String(data.serviceQrImage);
     if (data && Number.isFinite(Number(data.basePrice))) CONFIG.basePrice = Number(data.basePrice);
     if (data && data.trimPrices && typeof data.trimPrices === "object") {
       Object.keys(CONFIG.trimPrices).forEach((key) => {
@@ -468,7 +462,7 @@ function applyPreset(style) {
     top: style.trim, start: style.trim, hoodTop: style.trim, hoodBottom: style.trim,
   }) };
   if (style.notch) {
-    state.notchEnabled = true;
+    state.notchEnabled = style.notch.enabled !== false;
     if (style.notch.shape) state.notchShape = style.notch.shape;
     if (Number.isFinite(Number(style.notch.width))) state.notchWidth = Number(style.notch.width);
     if (Number.isFinite(Number(style.notch.height))) state.notchHeight = Number(style.notch.height);
@@ -646,7 +640,7 @@ function renderHomeCases() {
   track.innerHTML = HOME_CASES.map((item, index) => {
     const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
     return `<article class="case-slide" data-index="${index}">
-      <img class="case-image ${item.fit === "cover" ? "is-cover" : ""}" src="${esc(item.image)}" alt="${esc(item.name)}烟机罩案例" ${index ? 'loading="lazy"' : ""} draggable="false" />
+      <img class="case-image ${item.fit === "cover" ? "is-cover" : ""}" src="${esc(item.image)}" alt="${esc(item.name)}烟机罩案例" draggable="false" />
       <div class="case-shade"></div>
       <div class="case-meta">
         <h2 class="case-name">${esc(item.name)}</h2>
@@ -753,6 +747,7 @@ function setDim(key, value, round = true) {
   let next = clamp(value, dim.min, dim.max);
   if (round) next = Math.round(next / dim.step) * dim.step;
   state[key] = next;
+  if (key.startsWith("notch")) state.notchEnabled = true;
   normalizeState();
   syncUI({ activeInput: null });
   markDirty();
@@ -780,6 +775,7 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   $$("#notchOptions .notch-option").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.notch === state.notchShape);
   });
+  if ($("#notchHint")) $("#notchHint").hidden = state.notchEnabled !== false;
   const noSide = state.surfaceType === "none";
   if ($("#startLabel")) $("#startLabel").hidden = noSide;
   if ($("#startOptions")) $("#startOptions").hidden = noSide;
@@ -812,9 +808,7 @@ function syncUI({ activeInput = null, writeInputs = true } = {}) {
   if ($("#installPrice")) $("#installPrice").textContent = fmt(price.total);
   if ($("#installPriceBtn")) $("#installPriceBtn").textContent = fmt(price.total);
   if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
-  if ($("#checkoutPriceBtn")) $("#checkoutPriceBtn").textContent = fmt(price.total);
 
-  if (currentRoute() === "checkout") renderCheckoutSummary();
   schedulePreview();
 }
 
@@ -847,7 +841,7 @@ async function ensurePreview() {
 }
 
 /* ---------- 路由 ---------- */
-const ROUTES = ["home", "orders", "order", "customize", "install", "checkout", "pay", "done"];
+const ROUTES = ["home", "orders", "order", "customize", "install"];
 function currentRoute() {
   const route = location.hash.replace(/^#\/?/, "");
   return ROUTES.includes(route) ? route : "home";
@@ -866,7 +860,7 @@ function go(route, { replace = false } = {}) {
   }
 }
 function backTarget() {
-  return ({ orders: "home", order: "orders", customize: "home", install: "customize", checkout: "customize", pay: "checkout", done: "home" })[currentRoute()] || "home";
+  return ({ orders: "home", order: "orders", customize: "home", install: "customize" })[currentRoute()] || "home";
 }
 
 function renderRoute() {
@@ -889,15 +883,6 @@ function renderRoute() {
     updateInstallPrice();
     renderInstallTabs();
     setInstallStep(activeInstallKey, true);
-  }
-  if (route === "checkout") {
-    renderCheckout();
-  }
-  if (route === "pay") {
-    renderPay();
-  }
-  if (route === "done") {
-    renderDone();
   }
   window.scrollTo(0, 0);
 }
@@ -1076,6 +1061,7 @@ function renderCheckoutSummary() {
     sumRow("垫高", `${state.shimHeight}mm`),
     sumRow("主体", fmt(CONFIG.basePrice)),
     sumRow("装饰", fmt(price.trim)),
+    `<div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>`,
   ].join("");
 }
 
@@ -1083,7 +1069,6 @@ function renderCheckout() {
   renderCheckoutSummary();
   const price = priceInfo();
   if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
-  if ($("#checkoutPriceBtn")) $("#checkoutPriceBtn").textContent = fmt(price.total);
   const saved = readStored(STORAGE.customer, null);
   if (saved) {
     const fields = { coName: "name", coPhone: "phone", coRegion: "region", coAddress: "address" };
@@ -1092,7 +1077,7 @@ function renderCheckout() {
       if (input && !input.value) input.value = saved[key] || "";
     }
   }
-  $("#formError").textContent = "";
+  if ($("#formError")) $("#formError").textContent = "";
   $$(".field").forEach((field) => field.classList.remove("is-invalid"));
 }
 
@@ -1260,7 +1245,7 @@ function renderOrderDetail() {
     </section>
     <section class="order-detail-service">
       <p class="order-detail-service-title">有问题？加客服微信</p>
-      ${CONFIG.qrImage ? `<img class="order-detail-qr" src="${esc(CONFIG.qrImage)}" alt="客服微信二维码" />` : ""}
+      ${(CONFIG.serviceQrImage || CONFIG.qrImage) ? `<img class="order-detail-qr" src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}" alt="客服微信二维码" />` : ""}
       <p class="order-detail-wechat">微信号 <b>${esc(CONFIG.wechatId)}</b></p>
     </section>
   `;
@@ -1271,7 +1256,7 @@ function openServiceSheet() {
     title: "联系客服",
     backdrop: "light",
     body: `
-      <div class="service-qr"><img src="${esc(CONFIG.qrImage)}" alt="客服微信二维码" /></div>
+      <div class="service-qr"><img src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}" alt="客服微信二维码" /></div>
       <p class="service-wechat">微信号 <b>${esc(CONFIG.wechatId)}</b></p>
       <p class="sheet-note">扫码添加，发送订单号。</p>
     `,
@@ -1408,34 +1393,295 @@ async function flushPending() {
   }
 }
 
-/* ---------- 支付与完成 ---------- */
-function renderPay() {
-  if (!pendingOrder) {
-    pendingOrder = (() => {
-      try { return JSON.parse(sessionStorage.getItem(STORAGE.pendingOrder) || "null"); } catch { return null; }
-    })();
-  }
-  if (!pendingOrder) {
-    const previous = readStored(STORAGE.lastOrder, null);
-    if (previous?.submitted) {
-      lastOrder = previous;
-      go("done", { replace: true });
+/* ---------- 下单半屏 ---------- */
+let orderFlow = null;
+
+function qrFallbackMarkup() {
+  return `
+    <svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      <rect x="4" y="4" width="112" height="112" rx="14" fill="#fff" stroke="#e6ddcf" stroke-width="1.4" />
+      <rect x="16" y="16" width="26" height="26" rx="5" stroke="#2f5d46" stroke-width="4" />
+      <rect x="78" y="16" width="26" height="26" rx="5" stroke="#2f5d46" stroke-width="4" />
+      <rect x="16" y="78" width="26" height="26" rx="5" stroke="#2f5d46" stroke-width="4" />
+      <path d="M54 20h10v10H54zm16 0h4v4h-4zM54 36h4v4h-4zm12 4h10v10H66zM54 54h14v4H54zm20 8h8v8h-8zM54 70h4v14h-4zm10 6h10v4H64zm14-14h6v6h-6zm6 10h10v10H84z" fill="#2f5d46" opacity=".28" />
+      <circle cx="60" cy="60" r="12" fill="#2f5d46" />
+      <path d="M55.5 57.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5c0 2-1.3 3.7-3.1 4.3v2.2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
+      <circle cx="60" cy="67" r="1.1" fill="#fff" />
+    </svg>
+    <span>收款码加载失败，请刷新重试</span>`;
+}
+
+function orderCheckoutHtml() {
+  return `
+    <p class="order-sealed-hint" id="orderSealedHint" hidden>订单已提交，资料仅供核对。</p>
+    <form id="checkoutForm" class="order-step-form" novalidate>
+      <div class="form-card">
+        <label class="field"><span>收货人</span><input id="coName" autocomplete="name" placeholder="怎么称呼你" /></label>
+        <label class="field"><span>手机号</span><input id="coPhone" inputmode="numeric" autocomplete="tel" placeholder="用于接收发货通知" /></label>
+        <label class="field"><span>所在地区</span><input id="coRegion" autocomplete="address-level1" placeholder="省 / 市 / 区" /></label>
+        <label class="field"><span>详细地址</span><textarea id="coAddress" rows="2" autocomplete="street-address" placeholder="街道、门牌号、小区楼栋"></textarea></label>
+      </div>
+
+      <div class="order-card">
+        <div class="order-card-head"><h2>定制清单</h2><button type="button" id="editConfig" class="link-btn">修改</button></div>
+        <div id="orderSummary"></div>
+        <div class="order-total"><span>合计</span><b id="checkoutPrice">${fmt(priceInfo().total)}</b></div>
+      </div>
+
+      <p class="form-error" id="formError" role="alert"></p>
+    </form>`;
+}
+
+function orderPayHtml() {
+  return `
+    <div class="order-step-pay">
+      <div class="pay-card">
+        <div class="pay-amount"><small>应付金额</small><b id="payAmount">${fmt(priceInfo().total)}</b></div>
+        <div class="qr-wrap">
+          <img id="payQr" alt="微信收款二维码" />
+          <div id="payQrFallback" class="qr-fallback" hidden>${qrFallbackMarkup()}</div>
+        </div>
+        <p class="qr-hint">长按识别二维码支付</p>
+        <div class="pay-order">订单编号 <b id="payOrderNo">—</b></div>
+      </div>
+    </div>`;
+}
+
+function orderServiceHtml() {
+  const serviceQr = CONFIG.serviceQrImage || CONFIG.qrImage || "";
+  return `
+    <div class="order-step-service">
+      <p class="order-step-kicker">添加客服设计师🎨</p>
+      <div class="service-qr order-step-qr">
+        ${serviceQr ? `<img id="orderServiceQr" src="${esc(serviceQr)}" alt="客服微信二维码" />` : ""}
+        <p class="order-step-empty" id="orderServiceQrFallback" ${serviceQr ? "hidden" : ""}>客服二维码待配置</p>
+      </div>
+      <div class="copy-row"><span>客服微信</span><b>${esc(CONFIG.wechatId)}</b><button type="button" data-copy-value="${esc(CONFIG.wechatId)}">复制</button></div>
+      <div class="order-service-note">
+        <b>添加后请务必发送</b>
+        <span>支付截图 <em>+</em> 手机号</span>
+      </div>
+      <p class="order-service-tip">客服核对手机号后安排制作和发货。</p>
+    </div>`;
+}
+
+function orderSheetHtml() {
+  return `
+    <div class="order-flow">
+      <nav class="order-steps" id="orderSteps" role="tablist" aria-label="下单步骤">
+        <button type="button" role="tab" aria-selected="true" data-order-step="0">填写订单</button>
+        <button type="button" role="tab" aria-selected="false" data-order-step="1">扫码支付</button>
+        <button type="button" role="tab" aria-selected="false" data-order-step="2">添加客服</button>
+      </nav>
+      <section class="order-step" data-order-panel="0" role="tabpanel">${orderCheckoutHtml()}</section>
+      <section class="order-step" data-order-panel="1" role="tabpanel" hidden>${orderPayHtml()}</section>
+      <section class="order-step" data-order-panel="2" role="tabpanel" hidden>${orderServiceHtml()}</section>
+    </div>`;
+}
+
+function openOrderSheet() {
+  pendingOrder = null;
+  try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
+  const flow = { step: 0, maxStep: 0, busy: false, sealed: false, order: null, actionButton: null };
+  orderFlow = flow;
+
+  openSheet({
+    title: "下单限时免运费",
+    backdrop: "light",
+    sheetClass: "sheet--order",
+    body: orderSheetHtml(),
+    actions: [{ label: "确认订单，去支付", kind: "primary", onClick: () => handleOrderFlowAction() }],
+    onClose: () => resetOrderFlow(flow),
+  });
+
+  flow.actionButton = $("#sheetActions .btn");
+
+  $("#checkoutForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    confirmOrderStep();
+  });
+  $$("#checkoutForm input, #checkoutForm textarea").forEach((input) => {
+    input.addEventListener("input", () => {
+      input.closest(".field")?.classList.remove("is-invalid");
+      if ($("#formError")) $("#formError").textContent = "";
+    });
+  });
+  $("#editConfig")?.addEventListener("click", () => {
+    if (orderFlow?.sealed) {
+      toast("已提交，如需修改请添加客服");
       return;
     }
-    const saved = readStored(STORAGE.customer, null);
-    if (saved) {
-      pendingOrder = createOrder(saved);
-      try { sessionStorage.setItem(STORAGE.pendingOrder, JSON.stringify(pendingOrder)); } catch { /* ignore */ }
-    } else {
-      go("checkout", { replace: true });
-      toast("先填一下收货信息");
+    closeSheet();
+    go("customize");
+  });
+  $("#checkoutForm .form-card")?.addEventListener("click", () => {
+    if (orderFlow?.sealed) toast("已提交，如需修改请添加客服");
+  });
+  $("#orderSteps")?.addEventListener("click", (event) => {
+    if (!orderFlow || orderFlow.busy) return;
+    const button = event.target.closest("[data-order-step]");
+    if (!button) return;
+    const flow = orderFlow;
+    const index = Number(button.dataset.orderStep);
+    if (index > flow.maxStep) {
+      toast("请先完成当前步骤");
       return;
     }
+    if (index === flow.step) return;
+    if (index === 1 && flow.step === 0 && !flow.sealed) {
+      confirmOrderStep();
+      return;
+    }
+    setOrderStep(index);
+  });
+  const serviceQr = $("#orderServiceQr");
+  if (serviceQr) {
+    serviceQr.addEventListener("error", () => {
+      serviceQr.hidden = true;
+      const fallback = $("#orderServiceQrFallback");
+      if (fallback) fallback.hidden = false;
+    });
   }
-  if ($("#payAmount")) $("#payAmount").textContent = fmt(pendingOrder.price?.total ?? priceInfo().total);
-  if ($("#payOrderNo")) $("#payOrderNo").textContent = pendingOrder.id || "—";
-  if ($("#payWechat")) $("#payWechat").textContent = CONFIG.wechatId || "—";
+
+  renderCheckout();
   setupQr();
+  setOrderStep(0);
+  const body = $("#sheetBody");
+  if (body) body.scrollTop = 0;
+}
+
+function resetOrderFlow(flow) {
+  if (orderFlow !== flow) return;
+  if (!flow.busy) {
+    pendingOrder = null;
+    try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
+  }
+  orderFlow = null;
+}
+
+function setOrderStep(step) {
+  const flow = orderFlow;
+  if (!flow || step < 0 || step > 2 || step > flow.maxStep) return;
+  flow.step = step;
+
+  $$("[data-order-panel]").forEach((panel) => {
+    panel.hidden = Number(panel.dataset.orderPanel) !== step;
+  });
+  $$("#orderSteps [data-order-step]").forEach((button, index) => {
+    const selected = index === step;
+    button.setAttribute("aria-selected", String(selected));
+    const locked = !selected && index > flow.maxStep;
+    button.classList.toggle("is-locked", locked);
+    button.setAttribute("aria-disabled", String(locked));
+  });
+
+  const labels = ["确认订单，去支付", "我付好了，去加客服", "已加客服，查看订单"];
+  const action = flow.actionButton;
+  if (action) {
+    action.textContent = flow.busy ? "正在提交…" : labels[step];
+    action.disabled = flow.busy;
+  }
+
+  if (step === 1) {
+    const order = pendingOrder || flow.order;
+    if ($("#payAmount")) $("#payAmount").textContent = fmt(order?.price?.total ?? priceInfo().total);
+    if ($("#payOrderNo")) $("#payOrderNo").textContent = order?.id || "—";
+    setupQr();
+  }
+
+  if (flow.sealed) {
+    $$("#checkoutForm input, #checkoutForm textarea").forEach((input) => { input.readOnly = true; });
+    $("#checkoutForm .form-card")?.classList.add("is-sealed");
+    if ($("#editConfig")) {
+      $("#editConfig").hidden = false;
+      $("#editConfig").classList.add("is-disabled");
+      $("#editConfig").setAttribute("aria-disabled", "true");
+    }
+    if ($("#orderSealedHint")) $("#orderSealedHint").hidden = false;
+  }
+  const body = $("#sheetBody");
+  if (body) body.scrollTop = 0;
+}
+
+function handleOrderFlowAction() {
+  const flow = orderFlow;
+  if (!flow || flow.busy) return;
+  if (flow.step === 0) {
+    if (flow.sealed) setOrderStep(1);
+    else confirmOrderStep();
+  } else if (flow.step === 1) {
+    if (flow.sealed) setOrderStep(2);
+    else finishPaymentStep();
+  } else {
+    finishAddStep();
+  }
+}
+
+function confirmOrderStep() {
+  const flow = orderFlow;
+  if (!flow) return;
+  if (flow.sealed) {
+    toast("已提交，如需修改请添加客服");
+    return;
+  }
+  const customer = getCustomer();
+  const problems = validateCustomer(customer);
+  const errorNode = $("#formError");
+  if (problems.length) {
+    if (errorNode) errorNode.textContent = problems[0];
+    $(".field.is-invalid")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (errorNode) errorNode.textContent = "";
+  writeStored(STORAGE.customer, customer);
+  if (pendingOrder) {
+    pendingOrder.customer = { ...customer };
+  } else {
+    pendingOrder = createOrder(customer);
+  }
+  try { sessionStorage.setItem(STORAGE.pendingOrder, JSON.stringify(pendingOrder)); } catch { /* ignore */ }
+  flow.maxStep = Math.max(flow.maxStep, 1);
+  setOrderStep(1);
+}
+
+async function finishPaymentStep() {
+  const flow = orderFlow;
+  if (!flow || flow.busy) return;
+  if (!pendingOrder) {
+    toast("订单信息还没准备好");
+    setOrderStep(0);
+    return;
+  }
+  flow.busy = true;
+  setOrderStep(1);
+  const order = pendingOrder;
+  order.submitted = true;
+  try {
+    lastOrder = await submitOrder(order);
+  } catch {
+    lastOrder = order;
+    saveLocalOrder(order);
+    queueOrder(order);
+  }
+  pendingOrder = null;
+  try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
+  if (orderFlow !== flow) return;
+  flow.order = lastOrder;
+  flow.sealed = true;
+  flow.maxStep = 2;
+  flow.busy = false;
+  setOrderStep(2);
+}
+
+function finishAddStep() {
+  const flow = orderFlow;
+  if (!flow?.order) {
+    toast("订单还没提交");
+    return;
+  }
+  activeOrder = flow.order;
+  closeSheet();
+  go("order");
 }
 
 function setupQr() {
@@ -1461,87 +1707,6 @@ function setupQr() {
   img.src = CONFIG.qrImage;
 }
 
-function openPaymentSheet() {
-  if (!pendingOrder) {
-    toast("订单信息还没准备好");
-    return;
-  }
-  const orderId = pendingOrder.id;
-  openSheet({
-    title: "还差一步",
-    body: `
-      <p>添加好友并发送<b>订单号和付款截图</b>，即可安排优先发货。</p>
-      <div class="copy-row"><span>订单号</span><b>${esc(orderId)}</b><button type="button" data-copy-value="${esc(orderId)}">复制</button></div>
-      <div class="copy-row"><span>微信号</span><b>${esc(CONFIG.wechatId)}</b><button type="button" data-copy-value="${esc(CONFIG.wechatId)}">复制</button></div>
-      <p class="sheet-note">发送后客服会核对订单，并确认制作与发货排期。</p>
-    `,
-    actions: [
-      { label: "好的，去添加", kind: "primary", onClick: (button) => confirmPayment(button) },
-      { label: "我还没付", kind: "text", onClick: closeSheet },
-    ],
-  });
-}
-
-async function confirmPayment(button) {
-  if (!pendingOrder) return;
-  if (pendingOrder.submitted) {
-    closeSheet();
-    go("done");
-    return;
-  }
-  button.disabled = true;
-  button.textContent = "正在提交…";
-  const order = pendingOrder;
-  order.submitted = true;
-  try {
-    lastOrder = await submitOrder(order);
-  } catch {
-    lastOrder = order;
-    saveLocalOrder(order);
-    queueOrder(order);
-  }
-  pendingOrder = null;
-  try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
-  closeSheet();
-  go("done");
-}
-
-function renderDone() {
-  if (!lastOrder) lastOrder = readStored(STORAGE.lastOrder, null);
-  if ($("#doneOrderNo")) $("#doneOrderNo").textContent = lastOrder?.id || "—";
-  if ($("#doneWechat")) $("#doneWechat").textContent = CONFIG.wechatId;
-}
-
-function orderMessage(order) {
-  if (!order) return "";
-  const config = order.config || {};
-  const style = order.style || {};
-  const customer = order.customer || {};
-  const curveType = config.surfaceType || "concave";
-  const start = startLabelFor(curveType, config.surfaceStart);
-  const curve = curveType === "none"
-    ? "无侧面"
-    : curveType === "flat"
-      ? `不弯曲 · ${start}`
-      : `${curveType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
-  const trimLines = Array.isArray(order.price?.trimDetails)
-    ? order.price.trimDetails.map((item) => `装饰条·${item.name}：${item.styleName}${item.price ? ` ${fmt(item.price)}` : " 免费"}`)
-    : [`装饰条：${order.price?.trimName || "无"}`];
-  return [
-    `订单号：${order.id}`,
-    `款式：${style.name || ""} · ${style.tone || ""}`,
-    `下横：${config.hoodWidth} × ${config.hoodDepth}mm`,
-    `侧高：靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`,
-    `上竖：${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`,
-    `侧面：${curve}`,
-    ...trimLines,
-    `垫高：${config.shimHeight}mm`,
-    `合计：${fmt(order.price?.total || 0)}`,
-    `收货：${customer.name || ""} ${customer.phone || ""} ${customer.region || ""} ${customer.address || ""}`,
-    customer.note ? `备注：${customer.note}` : "",
-  ].filter(Boolean).join("\n");
-}
-
 /* ---------- 弹层 / Toast ---------- */
 function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose = null, sheetClass = "" }) {
   if (sheetOpen) sheetCleanup?.();
@@ -1549,7 +1714,7 @@ function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose 
   lastFocused = document.activeElement;
   const sheet = $(".sheet");
   if (sheet) {
-    sheet.classList.remove("sheet--install");
+    sheet.classList.remove("sheet--install", "sheet--order");
     if (sheetClass) sheet.classList.add(sheetClass);
   }
   $("#sheetTitle").textContent = title;
@@ -1577,7 +1742,7 @@ function closeSheet() {
   const cleanup = sheetCleanup;
   sheetCleanup = null;
   if (cleanup) cleanup();
-  $(".sheet")?.classList.remove("sheet--install");
+  $(".sheet")?.classList.remove("sheet--install", "sheet--order");
   $("#sheetRoot").hidden = true;
   $("#sheetRoot").classList.remove("is-light");
   document.body.classList.remove("sheet-open");
@@ -1826,6 +1991,7 @@ function bindEvents() {
     const button = event.target.closest("[data-notch]");
     if (!button) return;
     state.notchShape = button.dataset.notch;
+    state.notchEnabled = true;
     syncUI();
     markDirty();
   });
@@ -1888,7 +2054,7 @@ function bindEvents() {
     });
   });
 
-  $("#nextBtn")?.addEventListener("click", () => go("checkout"));
+  $("#nextBtn")?.addEventListener("click", () => openOrderSheet());
   $("#installGuideBtn")?.addEventListener("click", () => openInstallGuide());
   $("#orderInstallBtn")?.addEventListener("click", () => {
     if (activeOrder) openInstallGuide(orderInstallConfig(activeOrder));
@@ -1915,60 +2081,13 @@ function bindEvents() {
   });
   $("#ordersBottomContact")?.addEventListener("click", openServiceSheet);
   $("#installBack")?.addEventListener("click", () => go("customize"));
-  $("#installNext")?.addEventListener("click", () => go("checkout"));
+  $("#installNext")?.addEventListener("click", () => openOrderSheet());
   $("#installTabs")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-key]");
     if (!button) return;
     setInstallStep(button.dataset.key, true);
   });
   $("#replayBtn")?.addEventListener("click", () => setInstallStep(activeInstallKey, true));
-
-  $("#editConfig")?.addEventListener("click", () => go("customize"));
-
-  $("#checkoutForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const customer = getCustomer();
-    const problems = validateCustomer(customer);
-    const errorNode = $("#formError");
-    if (problems.length) {
-      errorNode.textContent = problems[0];
-      const firstInvalid = $(".field.is-invalid");
-      firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    errorNode.textContent = "";
-    writeStored(STORAGE.customer, customer);
-    pendingOrder = createOrder(customer);
-    try { sessionStorage.setItem(STORAGE.pendingOrder, JSON.stringify(pendingOrder)); } catch { /* ignore */ }
-    go("pay");
-  });
-  $$("#checkoutForm input, #checkoutForm textarea").forEach((input) => {
-    input.addEventListener("input", () => {
-      input.closest(".field")?.classList.remove("is-invalid");
-      $("#formError").textContent = "";
-    });
-  });
-
-  $("#payDone")?.addEventListener("click", openPaymentSheet);
-  $("#doneHome")?.addEventListener("click", () => {
-    Object.assign(state, DEFAULTS);
-    normalizeState();
-    syncUI({ writeInputs: true });
-    go("home");
-  });
-  $("#copyOrderBtn")?.addEventListener("click", () => {
-    if (!lastOrder) {
-      toast("订单信息还没准备好");
-      return;
-    }
-    copyText(orderMessage(lastOrder), "订单信息已复制，去微信粘贴发送");
-  });
-  $$("[data-copy-target]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const target = $(`#${button.dataset.copyTarget}`);
-      if (target) copyText(target.textContent.trim());
-    });
-  });
 
   $("#sheetRoot")?.addEventListener("click", (event) => {
     if (event.target.closest("[data-sheet-close]")) closeSheet();

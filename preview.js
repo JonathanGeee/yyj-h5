@@ -7,9 +7,10 @@ const INSTALL_CLEARANCE = 5;
 const TRIM_WIDTH = 16;
 const STYLE_PALETTE = {
   cloud: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  tall: { shell: 0xe6d2b7, trim: 0xd8be9e },
   line: { shell: 0xe6d2b7, trim: 0xd8be9e },
   arch: { shell: 0xe6d2b7, trim: 0xd8be9e },
-  retro: { shell: 0xe6d2b7, trim: 0xd8be9e },
+  crown: { shell: 0xe6d2b7, trim: 0xd8be9e },
   float: { shell: 0xe6d2b7, trim: 0xd8be9e },
 };
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
