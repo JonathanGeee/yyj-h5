@@ -20,6 +20,8 @@ export function createPreview(container, initialState, options = {}) {
   const fitMargin = options.fitMargin ?? 1.32;
   const softLighting = Boolean(options.softLighting);
   const aspectFit = Boolean(options.aspectFit);
+  const thumbnail = Boolean(options.thumbnail);
+  const pixelRatio = Number(options.pixelRatio) || (thumbnail ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2));
   let state = { ...initialState };
   let scene;
   let camera;
@@ -35,6 +37,10 @@ export function createPreview(container, initialState, options = {}) {
   let viewTween = 0;
   let flashTimer = 0;
   let restoreFadeTimer = 0;
+  let spinRaf = 0;
+  let spinToken = 0;
+  let spinTargetState = null;
+  let spinFallbackTimer = 0;
   const flashItems = [];
   const dimMaterials = new Map();
 
@@ -1055,6 +1061,111 @@ export function createPreview(container, initialState, options = {}) {
     renderer.render(scene, camera);
   }
 
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  // 首页缩略图专用：绕模型中心转半圈，在侧面瞬间换模型，再转回正面。
+  function spinToState(nextState, spinOptions = {}) {
+    if (!thumbnail) {
+      update(nextState);
+      return;
+    }
+    const direction = spinOptions.direction === -1 ? -1 : 1;
+    const duration = Math.max(0, Number(spinOptions.duration) || 620);
+    spinToken++;
+    const token = spinToken;
+    if (spinRaf) cancelAnimationFrame(spinRaf);
+    spinRaf = 0;
+    clearTimeout(spinFallbackTimer);
+    spinFallbackTimer = 0;
+
+    if (spinTargetState) {
+      update(spinTargetState);
+      resetView();
+      spinTargetState = null;
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion || duration <= 0) {
+      update(nextState);
+      renderer.render(scene, camera);
+      return;
+    }
+
+    spinTargetState = nextState;
+    const baseTarget = controls.target.clone();
+    const baseOffset = camera.position.clone().sub(baseTarget);
+    const baseRadius = Math.hypot(baseOffset.x, baseOffset.z);
+    const baseY = baseOffset.y;
+    const baseTheta = Math.atan2(baseOffset.x, baseOffset.z);
+    const half = duration / 2;
+
+    const drawAt = (theta, target, radius, yOffset) => {
+      camera.position.set(
+        target.x + Math.sin(theta) * radius,
+        target.y + yOffset,
+        target.z + Math.cos(theta) * radius
+      );
+      camera.lookAt(target);
+      renderer.render(scene, camera);
+    };
+
+    spinFallbackTimer = window.setTimeout(() => {
+      if (token !== spinToken) return;
+      spinToken++;
+      if (spinRaf) cancelAnimationFrame(spinRaf);
+      spinRaf = 0;
+      spinFallbackTimer = 0;
+      update(nextState);
+      resetView();
+      spinTargetState = null;
+    }, duration + 120);
+
+    const started = performance.now();
+    const phaseOne = (now) => {
+      if (token !== spinToken) return;
+      const t = Math.min(1, (now - started) / half);
+      drawAt(baseTheta + direction * Math.PI * easeInOutCubic(t), baseTarget, baseRadius, baseY);
+      if (t < 1) {
+        spinRaf = requestAnimationFrame(phaseOne);
+        return;
+      }
+
+      // 转到背面时换模型：各款背面都是接近平面的墙侧，切换最不显眼。
+      update(nextState);
+      const target = controls.target.clone();
+      const offset = camera.position.clone().sub(target);
+      const radius = Math.hypot(offset.x, offset.z);
+      const yOffset = offset.y;
+      const backTheta = Math.atan2(offset.x, offset.z);
+      drawAt(backTheta, target, radius, yOffset);
+      const startedTwo = performance.now();
+
+      const phaseTwo = (nowTwo) => {
+        if (token !== spinToken) return;
+        const t2 = Math.min(1, (nowTwo - startedTwo) / half);
+        drawAt(
+          backTheta + direction * Math.PI * easeInOutCubic(t2),
+          target,
+          radius,
+          yOffset
+        );
+        if (t2 < 1) {
+          spinRaf = requestAnimationFrame(phaseTwo);
+          return;
+        }
+        drawAt(baseTheta + direction * Math.PI * 2, target, radius, yOffset);
+        spinRaf = 0;
+        spinTargetState = null;
+        clearTimeout(spinFallbackTimer);
+        spinFallbackTimer = 0;
+      };
+      spinRaf = requestAnimationFrame(phaseTwo);
+    };
+    spinRaf = requestAnimationFrame(phaseOne);
+  }
+
   // 供安装页等外部调用：平滑移动相机 / 回到总览
   function cameraTo(position, target, duration = 600) {
     clearFocus();
@@ -1153,6 +1264,10 @@ export function createPreview(container, initialState, options = {}) {
 
   function dispose() {
     disposed = true;
+    if (spinRaf) cancelAnimationFrame(spinRaf);
+    spinRaf = 0;
+    clearTimeout(spinFallbackTimer);
+    spinFallbackTimer = 0;
     clearFocus();
     restoreHighlight();
     observer?.disconnect();
@@ -1178,7 +1293,7 @@ export function createPreview(container, initialState, options = {}) {
   camera.position.copy(modelCenter()).addScaledVector(initialDirection, fitDistance);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = false;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1216,6 +1331,11 @@ export function createPreview(container, initialState, options = {}) {
     controls.autoRotate = false;
     if (savedView) clearFocus();
   });
+  if (thumbnail) {
+    controls.enabled = false;
+    controls.enableRotate = false;
+    controls.enableDamping = false;
+  }
 
   controls.target.copy(modelCenter());
   buildModel();
@@ -1224,7 +1344,7 @@ export function createPreview(container, initialState, options = {}) {
   observer = new ResizeObserver(resize);
   observer.observe(container);
   resize();
-  renderer.setAnimationLoop(render);
+  if (!thumbnail) renderer.setAnimationLoop(render);
 
   // 安装说明页复用同一个模型：直接读取零件、材质并切换基础色。
   function getModel() {
@@ -1249,6 +1369,7 @@ export function createPreview(container, initialState, options = {}) {
 
   return {
     update,
+    spinToState,
     resetView,
     focusView,
     highlightPart,
@@ -1261,6 +1382,7 @@ export function createPreview(container, initialState, options = {}) {
     snapshot,
     getModel,
     getScene,
+    getCamera: () => camera,
     getMaterials,
     setModelColors,
   };

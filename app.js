@@ -515,6 +515,104 @@ const caseModel = {
 };
 let caseScrollTarget = null;
 let caseScrollTimer = 0;
+let caseThumbApi = null;
+let caseThumbLoading = false;
+let caseThumbFailed = false;
+let caseThumbIndex = 0;
+let caseThumbScheduled = false;
+
+function casePreviewState(index) {
+  const item = HOME_CASES[clamp(index, 0, HOME_CASES.length - 1)] || HOME_CASES[0];
+  const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
+  const notch = style.notch || {};
+  return {
+    styleId: style.id,
+    ...style.dims,
+    shimHeight: 0,
+    surfaceType: style.curve,
+    surfaceStart: style.start,
+    notchEnabled: notch.enabled !== false,
+    notchShape: notch.shape || "arch",
+    notchWidth: Number.isFinite(Number(notch.width)) ? Number(notch.width) : 420,
+    notchHeight: Number.isFinite(Number(notch.height)) ? Number(notch.height) : 80,
+    notchOffset: Number.isFinite(Number(notch.offset)) ? Number(notch.offset) : 0,
+    trimStyles: { ...(style.trims || {}) },
+  };
+}
+
+async function ensureCaseThumb() {
+  if (caseThumbApi || caseThumbLoading || caseThumbFailed) return;
+  if (currentRoute() !== "home") return;
+  const connection = navigator.connection;
+  if (connection && (connection.saveData || /(^|-)(2g|3g)$/.test(connection.effectiveType || ""))) {
+    caseThumbFailed = true;
+    return;
+  }
+  const container = $("#case3dCanvas");
+  if (!container) return;
+  caseThumbLoading = true;
+  const initialIndex = activeCaseIndex;
+  try {
+    const module = await import("./preview.js");
+    if (caseThumbApi || caseThumbFailed || currentRoute() !== "home") return;
+    const api = module.createPreview(container, casePreviewState(initialIndex), {
+      thumbnail: true,
+      aspectFit: true,
+      fitMargin: 1.9,
+      direction: [0.42, 0.14, 1.5],
+      pixelRatio: 1.5,
+    });
+    caseThumbApi = api;
+    caseThumbIndex = initialIndex;
+    if (activeCaseIndex !== initialIndex) {
+      api.update(casePreviewState(activeCaseIndex));
+      caseThumbIndex = activeCaseIndex;
+    }
+    const canvas = container.querySelector("canvas");
+    canvas?.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      caseThumbFailed = true;
+      caseThumbApi?.dispose();
+      caseThumbApi = null;
+      caseThumbIndex = activeCaseIndex;
+      caseModel.current = caseModelSrc(activeCaseIndex);
+      caseModel.currentIndex = activeCaseIndex;
+      if (caseModel.front) caseModel.front.src = caseModel.current;
+      caseModel.button?.classList.remove("is-live");
+    }, { once: true });
+    clearTimeout(caseModel.timer);
+    caseModel.timer = 0;
+    if (caseModel.animation) {
+      caseModel.animation.cancel();
+      caseModel.animation = null;
+    }
+    caseModel.current = caseModelSrc(caseThumbIndex);
+    caseModel.currentIndex = caseThumbIndex;
+    caseModel.requested = caseModel.current;
+    caseModel.requestedIndex = caseThumbIndex;
+    caseModel.button?.classList.remove("is-flipping");
+    caseModel.button?.classList.add("is-live");
+  } catch (error) {
+    caseThumbFailed = true;
+    console.warn("首页 3D 模型初始化失败，保留图片兜底", error);
+  } finally {
+    caseThumbLoading = false;
+  }
+}
+
+function scheduleCaseThumb() {
+  if (caseThumbApi || caseThumbLoading || caseThumbFailed || caseThumbScheduled) return;
+  caseThumbScheduled = true;
+  const run = () => {
+    caseThumbScheduled = false;
+    ensureCaseThumb();
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: 600 });
+  } else {
+    window.setTimeout(run, 400);
+  }
+}
 
 function caseModelSrc(index) {
   const item = HOME_CASES[clamp(index, 0, HOME_CASES.length - 1)];
@@ -555,6 +653,27 @@ function setCaseModel(index, { immediate = false } = {}) {
   const normalized = clamp(index, 0, HOME_CASES.length - 1);
   const src = caseModelSrc(normalized);
   if (!src) return;
+
+  if (caseThumbApi) {
+    if (normalized === caseThumbIndex) return;
+    const direction = normalized >= caseThumbIndex ? 1 : -1;
+    caseThumbIndex = normalized;
+    caseModel.current = src;
+    caseModel.currentIndex = normalized;
+    caseModel.requested = src;
+    caseModel.requestedIndex = normalized;
+    clearTimeout(caseModel.timer);
+    caseModel.timer = 0;
+    if (caseModel.animation) {
+      caseModel.animation.cancel();
+      caseModel.animation = null;
+    }
+    caseModel.button?.classList.remove("is-flipping");
+    caseModel.button?.setAttribute("aria-label", `查看${HOME_CASES[normalized].name}的 3D 模型`);
+    caseThumbApi.spinToState(casePreviewState(normalized), { direction, duration: 760 });
+    return;
+  }
+
   if (src === caseModel.current && !caseModel.animation && !caseModel.timer) return;
   if (src === caseModel.requested && (caseModel.animation || caseModel.timer)) return;
 
@@ -1054,8 +1173,12 @@ function renderRoute() {
   const route = currentRoute();
   $$(".view").forEach((view) => view.classList.toggle("is-active", view.dataset.view === route));
   closeSheet();
-  if (route === "home") restartCaseAuto();
-  else stopCaseAuto();
+  if (route === "home") {
+    restartCaseAuto();
+    scheduleCaseThumb();
+  } else {
+    stopCaseAuto();
+  }
   if (route === "orders") {
     renderOrdersPage();
   }
