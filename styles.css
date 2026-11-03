@@ -1126,7 +1126,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   height: 46px;
   font-size: 14px;
 }
-.sheet--drawing .drawing-art { height: 70px; }
+.sheet--drawing .drawing-art { height: 80px; }
 
 /* ---------- 下单半屏 ---------- */
 .sheet.sheet--order {
@@ -1867,17 +1867,20 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 8px 0;
+  min-height: 46px;
+  padding: 10px 0;
   border: 0;
   border-bottom: 1px solid #eceee9;
   background: transparent;
   text-align: left;
 }
+.trim-row-art { flex: 0 0 32px; height: 25px; }
+.trim-row-art svg { width: 100%; height: 100%; }
 .trim-row-main { flex: 1; min-width: 0; }
-.trim-row-name { display: block; font-size: 11.5px; font-weight: 600; }
+.trim-row-name { display: block; font-size: 12px; font-weight: 600; }
 .trim-row-hint { display: block; margin-top: 1px; color: var(--faint); font-size: 8px; }
-.trim-row-current { flex: none; color: var(--green); font-size: 9.5px; font-weight: 600; }
-.trim-row-price { flex: none; width: 34px; color: var(--ink-2); font-size: 9.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.trim-row-current { flex: none; color: var(--green); font-size: 10px; font-weight: 600; }
+.trim-row-price { flex: none; width: 36px; color: var(--ink-2); font-size: 10px; text-align: right; font-variant-numeric: tabular-nums; }
 .trim-row-chevron { flex: none; width: 13px; height: 13px; color: var(--faint); }
 .trim-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #f4f6f2; color: var(--muted); font-size: 9.5px; }
 .trim-total b { color: var(--green); font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -1886,20 +1889,20 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
 .trim-picker-card {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  padding: 7px 6px;
+  padding: 9px 7px;
   border: 1.5px solid var(--line);
   border-radius: 13px;
   background: #fff;
   text-align: left;
 }
 .trim-picker-card.is-active { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 3px rgba(36, 92, 69, 0.07); }
-.trim-picker-art { flex: 0 0 36px; height: 30px; }
+.trim-picker-art { flex: 0 0 42px; height: 34px; }
 .trim-picker-art svg { width: 100%; height: 100%; }
 .trim-picker-copy { min-width: 0; }
 .trim-picker-copy b { display: block; font-size: 9.5px; font-weight: 650; }
-.trim-picker-copy span { display: block; margin-top: 1px; color: var(--faint); font-size: 7px; }
+.trim-picker-copy span { display: block; margin-top: 1px; color: var(--faint); font-size: 7.5px; }
 .trim-picker-copy em { display: block; margin-top: 3px; color: var(--green); font-size: 9px; font-style: normal; font-weight: 700; }
 
 @media (min-width: 560px) {

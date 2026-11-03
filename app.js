@@ -312,18 +312,34 @@ function hoodArt(style, { transparent = false } = {}) {
   </svg>`;
 }
 
-function trimArt(id) {
-  const base = `<rect x="2" y="2" width="60" height="44" rx="9" fill="#ffffff"/>`;
+function trimArtMarkup(id) {
   if (id === "none") {
-    return `<svg viewBox="0 0 64 48">${base}<path d="M10 31h44" stroke="#c9b79d" stroke-width="1.4" stroke-dasharray="4 4"/><path d="M10 31h44" stroke="#e9dfd0" stroke-width="7" opacity=".45"/></svg>`;
+    return `
+      <rect x="6" y="29" width="52" height="11" rx="2" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
+      <path d="M12 29H52" stroke="#b9b3a8" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <path d="M12 35H52" stroke="#e1d8c8" stroke-width="1" opacity=".75"/>
+    `;
   }
-  if (id === "single") {
-    return `<svg viewBox="0 0 64 48">${base}<path d="M10 32h44" stroke="#c9ae8b" stroke-width="7" stroke-linecap="round"/><path d="M13 29h38" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".7"/></svg>`;
+  if (id === "corner") {
+    return `
+      <rect x="8" y="5" width="48" height="10" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
+      <rect x="8" y="5" width="10" height="38" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
+      <path d="M18 15H52V19.5C40 21 24 28 18 39Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M21 17H48" stroke="#ffffff" stroke-width="1" opacity=".55"/>
+      <path d="M48 19.5V23.5" stroke="#b89d7a" stroke-width=".8" opacity=".55"/>
+    `;
   }
-  if (id === "double") {
-    return `<svg viewBox="0 0 64 48">${base}<path d="M10 26h44" stroke="#c9ae8b" stroke-width="4" stroke-linecap="round"/><path d="M10 36h44" stroke="#c9ae8b" stroke-width="4" stroke-linecap="round"/><path d="M13 24h38" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity=".6"/></svg>`;
-  }
-  return `<svg viewBox="0 0 64 48">${base}<path d="M11 36h30V16" fill="none" stroke="#c9ae8b" stroke-width="7" stroke-linecap="square"/><path d="M13 33h26" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity=".55"/></svg>`;
+  return `
+    <rect x="5" y="30" width="54" height="10" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
+    <path d="M20 30A12 12 0 0 1 44 30Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="M23 27A9 9 0 0 1 33 20" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity=".55"/>
+    <path d="M18 30H46" stroke="#b89d7a" stroke-width=".9" opacity=".7"/>
+  `;
+}
+
+function trimArt(id) {
+  const style = id === "none" ? "none" : id === "corner" ? "corner" : "single";
+  return `<svg viewBox="0 0 64 48" aria-hidden="true">${trimArtMarkup(style)}</svg>`;
 }
 
 function notchArt(shape) {
@@ -1380,6 +1396,7 @@ function renderTrimList() {
   list.innerHTML = activeTrimPositions().map((position) => {
     const trim = trimFor(position.key);
     return `<button class="trim-row" type="button" data-trim-position="${position.key}">
+      <span class="trim-row-art" aria-hidden="true">${trimArt(trim.id)}</span>
       <span class="trim-row-main"><b class="trim-row-name">${position.name}</b></span>
       <span class="trim-row-current">${trim.name}</span>
       <span class="trim-row-price">${trim.price ? fmt(trim.price) : "免费"}</span>
@@ -1930,76 +1947,212 @@ function orderDetailNumber(value, fallback) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function orderDrawingSvg(part) {
-  const w = Math.max(1, part.w || 1);
-  const h = Math.max(1, part.h || 1);
-  const maxW = 132;
-  const maxH = 58;
-  const scale = Math.min(maxW / w, maxH / h);
-  const sw = Math.max(10, w * scale);
-  const sh = Math.max(10, h * scale);
-  const x = (160 - sw) / 2;
-  const y = 12 + (maxH - sh) / 2;
-  const stroke = "#245c45";
-  const fill = "rgba(36, 92, 69, 0.08)";
-  let d = "";
+const ORDER_PANEL = 5;
+const ORDER_CLEARANCE = 5;
 
-  if (part.kind === "side") {
-    const backH = Math.max(part.backH || h, part.frontH || h);
-    const frontH = Math.min(part.backH || h, part.frontH || h);
-    const drop = Math.min(sh * 0.45, Math.max(0, (backH - frontH) * scale));
-    d = `M${x} ${y} L${x + sw} ${y + drop} L${x + sw} ${y + sh} L${x} ${y + sh} Z`;
-  } else if (part.kind === "curve") {
-    const bend = Math.min(10, sh * 0.2) * (part.surface === "convex" ? -1 : 1);
-    d = `M${x} ${y} Q${x + sw / 2} ${y + bend} ${x + sw} ${y} L${x + sw} ${y + sh} Q${x + sw / 2} ${y + sh - bend * 0.5} ${x} ${y + sh} Z`;
-  } else if (part.kind === "notch") {
-    const rawWidth = (part.notchWidth || 0) * scale;
-    const rawHeight = (part.notchHeight || 0) * scale;
-    const notchW = Math.min(sw * 0.78, Math.max(sw * 0.1, rawWidth));
-    const notchH = Math.min(sh * 0.62, Math.max(2, rawHeight));
-    const center = x + sw / 2 + (part.notchOffset || 0) * scale;
-    const left = Math.max(x + 4, Math.min(x + sw - 4, center - notchW / 2));
-    const right = Math.max(x + 4, Math.min(x + sw - 4, center + notchW / 2));
-    const top = y + sh - notchH;
-    if (part.notchShape === "trapezoid") {
-      const inset = Math.min(notchW * 0.18, notchH * 0.55);
-      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} L${right - inset} ${top} H${left + inset} L${left} ${y + sh} H${x} Z`;
-    } else if (part.notchShape === "arch" || part.notchShape === "rounded") {
-      const shoulder = y + sh - notchH * 0.42;
-      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} V${shoulder} Q${right} ${top} ${center} ${top} Q${left} ${top} ${left} ${shoulder} V${y + sh} H${x} Z`;
-    } else {
-      d = `M${x} ${y} H${x + sw} V${y + sh} H${right} V${top} H${left} V${y + sh} H${x} Z`;
-    }
-  } else {
-    d = `M${x} ${y} H${x + sw} V${y + sh} H${x} Z`;
+function orderRectOutline(w, h) {
+  return [[0, 0], [w, 0], [w, h], [0, h]];
+}
+
+// 与 preview.js 完全一致的曲面过渡剖面：内凹 / 外凸 / 平斜。
+function orderTransitionProfile(t, surfaceType) {
+  if (surfaceType === "flat" || surfaceType === "none") return { spread: t, drop: t };
+  const inverse = 1 - t;
+  const concave = surfaceType === "concave";
+  const control1 = concave ? [0, 0.42] : [0.42, 0];
+  const control2 = concave ? [0.72, 1] : [1, 0.72];
+  return {
+    spread: 3 * inverse * inverse * t * control1[0] + 3 * inverse * t * t * control2[0] + t ** 3,
+    drop: 3 * inverse * inverse * t * control1[1] + 3 * inverse * t * t * control2[1] + t ** 3,
+  };
+}
+
+// 与 preview.js 的 notchProfile 保持一致，保证展开图豁口和 3D 模型同形。
+function orderNotchProfile(baseY, left, right, height, shape = "arch") {
+  const top = baseY + height;
+  if (shape === "rect") {
+    return [[right, baseY], [right, top], [left, top], [left, baseY]];
   }
+  if (shape === "trapezoid") {
+    const inset = Math.min((right - left) * 0.2, height * 0.6);
+    return [[right, baseY], [right - inset, top], [left + inset, top], [left, baseY]];
+  }
+  if (shape === "rounded") {
+    const radius = Math.min(height * 0.45, (right - left) * 0.18);
+    const points = [[right, baseY]];
+    for (let index = 0; index <= 10; index++) {
+      const angle = (Math.PI / 2) * (index / 10);
+      points.push([right - radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
+    }
+    for (let index = 1; index <= 10; index++) {
+      const angle = Math.PI / 2 + (Math.PI / 2) * (index / 10);
+      points.push([left + radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
+    }
+    points.push([left, baseY]);
+    return points;
+  }
+  const cx = (left + right) / 2;
+  const half = (right - left) / 2;
+  const rise = Math.max(1, height);
+  const radius = (half * half + rise * rise) / (2 * rise);
+  const cy = baseY + rise - radius;
+  const startAngle = Math.atan2(baseY - cy, right - cx);
+  const endAngle = Math.atan2(baseY - cy, left - cx);
+  const points = [];
+  for (let index = 0; index <= 36; index++) {
+    const angle = startAngle + (endAngle - startAngle) * (index / 36);
+    points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+  }
+  return points;
+}
 
-  const centerLine = part.kind === "notch" || part.kind === "curve" || part.kind === "side"
-    ? `<path d="M${x + sw / 2} ${y + 2} V${y + sh - 2}" stroke="${stroke}" stroke-width=".6" stroke-dasharray="2 3" opacity=".24"/>`
-    : "";
-  return `<svg viewBox="0 0 160 96" aria-hidden="true">
-    <path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="1.2" stroke-linejoin="round"/>
+// 按 preview.js 的 buildModel 参数还原外罩实际外尺寸（含板厚和安装间隙）。
+function orderDrawingMetrics(config) {
+  const shim = clamp(orderDetailNumber(config.shimHeight, 0), 0, 60);
+  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
+  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
+  const rearHeightUser = orderDetailNumber(config.rearHeight, 380);
+  const frontHeightUser = orderDetailNumber(config.frontHeight, 240);
+  const chimneyWidthUser = orderDetailNumber(config.chimneyWidth, 320);
+  const chimneyDepthUser = orderDetailNumber(config.chimneyDepth, 280);
+  const chimneyHeightUser = orderDetailNumber(config.chimneyHeight, 500);
+  const width = hoodWidth + 2 * (ORDER_CLEARANCE + ORDER_PANEL);
+  const depth = hoodDepth + ORDER_PANEL;
+  const rearHeight = rearHeightUser + ORDER_PANEL + shim;
+  const frontHeight = frontHeightUser + ORDER_PANEL + shim;
+  const chimneyWidth = chimneyWidthUser + 2 * (ORDER_CLEARANCE + ORDER_PANEL);
+  const chimneyDepth = chimneyDepthUser + ORDER_PANEL;
+  const chimneyHeight = chimneyHeightUser - ORDER_PANEL;
+  const backZ = -depth;
+  const frontZ = 0;
+  const chimneyFrontZ = backZ + chimneyDepth;
+  const topFrontZ = frontZ - ORDER_PANEL;
+  const topDepth = topFrontZ - backZ;
+  const bottomFrontY = rearHeight - frontHeight;
+  const totalHeight = rearHeight + chimneyHeight;
+  const sideFrontZ = frontZ - ORDER_PANEL;
+  const sideTopY = rearHeight - ORDER_PANEL;
+  const sideBottomFrontY = bottomFrontY * (sideFrontZ - backZ) / depth;
+  const chimneyLeft = -chimneyWidth / 2;
+  const chimneyRight = chimneyWidth / 2;
+  const chimneyOpeningWidth = chimneyWidthUser + 2 * ORDER_CLEARANCE;
+  const chimneyOpeningDepth = chimneyDepthUser;
+  const surfaceType = config.surfaceType || "concave";
+  const surfaceStart = config.surfaceStart || "middle";
+  const startFraction = surfaceType === "convex"
+    ? (surfaceStart === "lowest" ? 0.28 : 0.4)
+    : (surfaceStart === "top" ? 1 : 0.5);
+  const startY = rearHeight + chimneyHeight * startFraction;
+  const notchEnabled = config.notchEnabled !== false;
+  const notchWidth = notchEnabled ? Math.min(orderDetailNumber(config.notchWidth, 420), width - 60) : 0;
+  const notchOffset = clamp(
+    orderDetailNumber(config.notchOffset, 0),
+    -(width - notchWidth) / 2 + 25,
+    (width - notchWidth) / 2 - 25
+  );
+  const notchHeight = notchEnabled ? Math.min(orderDetailNumber(config.notchHeight, 80), frontHeight - 24) : 0;
+  const notchLeft = notchOffset - notchWidth / 2;
+  const notchRight = notchOffset + notchWidth / 2;
+  return {
+    shim, hoodWidth, hoodDepth, rearHeightUser, frontHeightUser,
+    chimneyWidthUser, chimneyDepthUser, chimneyHeightUser,
+    width, depth, rearHeight, frontHeight, chimneyWidth, chimneyDepth, chimneyHeight,
+    backZ, frontZ, chimneyFrontZ, topFrontZ, topDepth, bottomFrontY, totalHeight,
+    sideFrontZ, sideTopY, sideBottomFrontY, chimneyLeft, chimneyRight,
+    chimneyOpeningWidth, chimneyOpeningDepth,
+    surfaceType, surfaceStart, startY,
+    notchEnabled, notchWidth, notchOffset, notchHeight, notchLeft, notchRight,
+    notchShape: config.notchShape || "arch",
+  };
+}
+
+// 可展直纹面等距展开：横坐标是展开弧长，纵坐标是每一条水平/纵深母线。
+// 这样曲面前片的上下宽度、展开高度、左右边界都与 3D 模型一致，只是整体等比缩小。
+function orderTransitionOutline(metrics, side) {
+  const samples = 64;
+  const fineCount = samples * 8 + 1;
+  const fineT = Array.from({ length: fineCount }, (_, index) => index / (fineCount - 1));
+  const rows = fineT.map((t) => {
+    const { spread, drop } = orderTransitionProfile(t, metrics.surfaceType);
+    const y = metrics.startY + drop * (metrics.rearHeight - metrics.startY);
+    if (side) {
+      return {
+        x: metrics.chimneyLeft + spread * (-metrics.width / 2 - metrics.chimneyLeft),
+        y,
+        d: metrics.chimneyDepth + spread * (metrics.depth - metrics.chimneyDepth),
+      };
+    }
+    return {
+      y,
+      z: metrics.chimneyFrontZ + spread * (metrics.frontZ - metrics.chimneyFrontZ),
+      x0: -metrics.chimneyWidth / 2 + spread * (-metrics.width / 2 + metrics.chimneyWidth / 2),
+      x1: metrics.chimneyWidth / 2 + spread * (metrics.width / 2 - metrics.chimneyWidth / 2),
+    };
+  });
+  const arc = [0];
+  for (let index = 1; index < fineCount; index++) {
+    const previous = rows[index - 1];
+    const current = rows[index];
+    const first = side ? current.x - previous.x : current.y - previous.y;
+    const second = side ? current.y - previous.y : current.z - previous.z;
+    arc.push(arc[index - 1] + Math.hypot(first, second));
+  }
+  const pick = (values, index) => values[Math.round(index * (fineCount - 1) / (samples - 1))];
+  const arcLength = arc[arc.length - 1];
+  const outline = [];
+  if (side) {
+    const depths = rows.map((row) => row.d);
+    for (let index = 0; index < samples; index++) outline.push([0, pick(arc, index)]);
+    outline.push([pick(depths, samples - 1), arcLength]);
+    for (let index = samples - 2; index >= 0; index--) outline.push([pick(depths, index), pick(arc, index)]);
+    return {
+      outline,
+      w: metrics.depth,
+      h: arcLength,
+      topWidth: metrics.chimneyDepth,
+      bottomWidth: metrics.depth,
+    };
+  }
+  const x0Values = rows.map((row) => row.x0);
+  const x1Values = rows.map((row) => row.x1);
+  const shift = metrics.width / 2;
+  for (let index = 0; index < samples; index++) outline.push([pick(x0Values, index) + shift, pick(arc, index)]);
+  outline.push([pick(x1Values, samples - 1) + shift, arcLength]);
+  for (let index = samples - 2; index >= 0; index--) outline.push([pick(x1Values, index) + shift, pick(arc, index)]);
+  return {
+    outline,
+    w: metrics.width,
+    h: arcLength,
+    topWidth: metrics.chimneyWidth,
+    bottomWidth: metrics.width,
+  };
+}
+
+function orderDrawingSvg(part, scale) {
+  const sw = Math.max(1, part.w * scale);
+  const sh = Math.max(1, part.h * scale);
+  const ox = (160 - sw) / 2;
+  const oy = (84 - sh) / 2;
+  const d = `${part.outline.map(([x, y], index) =>
+    `${index === 0 ? "M" : "L"}${(ox + x * scale).toFixed(2)} ${(oy + y * scale).toFixed(2)}`
+  ).join(" ")} Z`;
+  const centerLine = part.kind === "shim"
+    ? ""
+    : `<path d="M${(ox + sw / 2).toFixed(1)} ${(oy + 3).toFixed(1)} V${(oy + sh - 3).toFixed(1)}" stroke="#245c45" stroke-width=".6" stroke-dasharray="2 3" opacity=".22"/>`;
+  return `<svg viewBox="0 0 160 84" aria-hidden="true">
+    <path d="${d}" fill="rgba(36, 92, 69, 0.08)" stroke="#245c45" stroke-width="1.2" stroke-linejoin="round"/>
     ${centerLine}
   </svg>`;
 }
 
 function orderTrimSvg(part) {
-  const count = Math.max(1, Math.min(5, Number(part.count) || 3));
-  const barWidth = 124;
-  const barHeight = 6;
-  const gap = 4;
-  const totalHeight = count * barHeight + (count - 1) * gap;
-  const x = (160 - barWidth) / 2;
-  const top = 48 - totalHeight / 2;
-  const bars = Array.from({ length: count }, (_, index) => {
-    const y = top + index * (barHeight + gap);
-    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="${barHeight / 2}" fill="rgba(36, 92, 69, 0.08)" stroke="#245c45" stroke-width="1"/>`;
-  }).join("");
-  return `<svg viewBox="0 0 160 96" aria-hidden="true">${bars}</svg>`;
+  return `<svg viewBox="0 0 160 84" aria-hidden="true">
+    <g transform="translate(32 6) scale(1.5)">${trimArtMarkup(part.styleId || "single")}</g>
+  </svg>`;
 }
 
-function orderDrawingTile(part) {
-  const art = part.kind === "trim" ? orderTrimSvg(part) : orderDrawingSvg(part);
+function orderDrawingTile(part, scale = 1) {
+  const art = part.kind === "trim" ? orderTrimSvg(part) : orderDrawingSvg(part, scale);
   return `<article class="drawing-tile">
     <div class="drawing-art">${art}</div>
     <b>${esc(part.name)}</b>
@@ -2012,33 +2165,28 @@ function orderDrawingSort(parts) {
   return parts.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h) || b.w - a.w);
 }
 
-function orderTrimParts(config) {
+function orderTrimParts(config, metrics) {
   const styles = config.trimStyles || {};
-  const notchEnabled = config.notchEnabled !== false;
-  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
-  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
-  const chimneyWidth = orderDetailNumber(config.chimneyWidth, 320);
-  const chimneyDepth = orderDetailNumber(config.chimneyDepth, 280);
-  const surfaceType = config.surfaceType || "concave";
   return TRIM_POSITIONS.flatMap((position) => {
     const styleId = styles[position.key] || "none";
     const trim = TRIMS.find((item) => item.id === styleId);
     if (!trim || trim.id === "none") return [];
-    if (position.key === "start" && surfaceType === "none") return [];
+    if (position.key === "start" && (metrics.surfaceType === "none" || metrics.surfaceStart === "top")) return [];
     const isHood = position.key === "hoodTop" || position.key === "hoodBottom";
-    const front = isHood ? hoodWidth : chimneyWidth;
-    const side = isHood ? hoodDepth : chimneyDepth;
+    const front = isHood ? metrics.width : metrics.chimneyWidth;
+    const side = isHood ? metrics.depth : metrics.chimneyDepth;
     let count = 3;
-    let size = `3 根 · 正面 ${front} / 侧 ${side}mm`;
-    if (position.key === "hoodBottom" && notchEnabled) {
+    let size = `3 根 · 正面 ${Math.round(front)} / 侧 ${Math.round(side)}mm`;
+    if (position.key === "hoodBottom" && metrics.notchEnabled) {
       count = 5;
-      size = `5 根 · 两侧 ${side} + 正面分 3 段`;
+      size = `5 根 · 两侧 ${Math.round(side)} + 正面分 3 段`;
     }
     return [{
       name: `${position.name}装饰条`,
       w: front,
       h: 1,
       kind: "trim",
+      styleId: trim.id,
       count,
       size,
       note: trim.name,
@@ -2046,62 +2194,134 @@ function orderTrimParts(config) {
   });
 }
 
+function orderGroupScale(parts) {
+  const items = parts.filter((part) => Array.isArray(part.outline));
+  if (!items.length) return 1;
+  const maxW = Math.max(...items.map((part) => Math.max(1, part.w)));
+  const maxH = Math.max(...items.map((part) => Math.max(1, part.h)));
+  return Math.min((160 - 28) / maxW, (84 - 12) / maxH);
+}
+
 function buildOrderDrawingGroups(config) {
-  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
-  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
-  const rearHeight = orderDetailNumber(config.rearHeight, 380);
-  const frontHeight = orderDetailNumber(config.frontHeight, 240);
-  const chimneyWidth = orderDetailNumber(config.chimneyWidth, 320);
-  const chimneyDepth = orderDetailNumber(config.chimneyDepth, 280);
-  const chimneyHeight = orderDetailNumber(config.chimneyHeight, 500);
-  const shimHeight = orderDetailNumber(config.shimHeight, 0);
-  const notchEnabled = config.notchEnabled !== false;
-  const notchWidth = orderDetailNumber(config.notchWidth, 420);
-  const notchHeight = orderDetailNumber(config.notchHeight, 80);
-  const notchOffset = orderDetailNumber(config.notchOffset, 0);
-  const notchShape = config.notchShape || "arch";
+  const metrics = orderDrawingMetrics(config);
+  const {
+    width, rearHeight, frontHeight, chimneyWidth, chimneyDepth, chimneyHeight,
+    backZ, topFrontZ, topDepth, bottomFrontY, sideFrontZ, sideTopY, sideBottomFrontY,
+    chimneyOpeningWidth, chimneyOpeningDepth, notchEnabled, notchWidth, notchHeight,
+  } = metrics;
+
+  const notchContour = notchEnabled
+    ? orderNotchProfile(bottomFrontY, metrics.notchLeft, metrics.notchRight, notchHeight, metrics.notchShape)
+    : [];
+  const frontOutline = [
+    [-width / 2, bottomFrontY],
+    [-width / 2, rearHeight],
+    [width / 2, rearHeight],
+    [width / 2, bottomFrontY],
+    ...notchContour,
+  ].map(([x, y]) => [x + width / 2, rearHeight - y]);
+
+  const sideOutline = [
+    [backZ, 0],
+    [backZ, sideTopY],
+    [sideFrontZ, sideTopY],
+    [sideFrontZ, sideBottomFrontY],
+  ].map(([z, y]) => [z - backZ, sideTopY - y]);
+
+  const topOutline = [
+    [-width / 2, backZ],
+    [-chimneyOpeningWidth / 2, backZ],
+    [-chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
+    [chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
+    [chimneyOpeningWidth / 2, backZ],
+    [width / 2, backZ],
+    [width / 2, topFrontZ],
+    [-width / 2, topFrontZ],
+  ].map(([x, z]) => [x + width / 2, z - backZ]);
 
   const lower = [
-    { name: "下横顶板", w: hoodWidth, h: hoodDepth, kind: "rect", size: `${hoodWidth} × ${hoodDepth}mm` },
     {
-      name: "下横前挡板", w: hoodWidth, h: frontHeight, kind: notchEnabled ? "notch" : "rect",
-      notchWidth, notchHeight, notchOffset, notchShape,
-      size: `${hoodWidth} × ${frontHeight}mm`,
-      note: notchEnabled ? `开口 ${notchWidth} × ${notchHeight}mm` : "",
+      name: "下横顶板", w: width, h: topDepth, kind: "top", outline: topOutline,
+      size: `${Math.round(width)} × ${Math.round(topDepth)}mm`,
+      note: `后缘烟道口 ${Math.round(chimneyOpeningWidth)} × ${Math.round(chimneyOpeningDepth)}mm`,
     },
     {
-      name: "下横左侧板", w: hoodDepth, h: rearHeight, backH: rearHeight, frontH: frontHeight, kind: "side",
-      size: `${hoodDepth} × ${rearHeight}mm`, note: `前侧 ${frontHeight}mm`,
+      name: "下横前挡板", w: width, h: frontHeight, kind: "front", outline: frontOutline,
+      size: `${Math.round(width)} × ${Math.round(frontHeight)}mm`,
+      note: notchEnabled
+        ? `开口 ${Math.round(notchWidth)} × ${Math.round(notchHeight)}mm · 板厚 5mm`
+        : "板厚 5mm",
     },
     {
-      name: "下横右侧板", w: hoodDepth, h: rearHeight, backH: rearHeight, frontH: frontHeight, kind: "side",
-      size: `${hoodDepth} × ${rearHeight}mm`, note: `前侧 ${frontHeight}mm`,
+      name: "下横左侧板", w: topDepth, h: sideTopY, kind: "side", outline: sideOutline,
+      size: `${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,
+      note: `前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,
     },
-  ];
-  const upper = [
-    { name: "上竖前挡板", w: chimneyWidth, h: chimneyHeight, kind: "rect", size: `${chimneyWidth} × ${chimneyHeight}mm` },
-    { name: "上竖左侧板", w: chimneyDepth, h: chimneyHeight, kind: "rect", size: `${chimneyDepth} × ${chimneyHeight}mm` },
-    { name: "上竖右侧板", w: chimneyDepth, h: chimneyHeight, kind: "rect", size: `${chimneyDepth} × ${chimneyHeight}mm` },
+    {
+      name: "下横右侧板", w: topDepth, h: sideTopY, kind: "side", outline: sideOutline,
+      size: `${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,
+      note: `前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,
+    },
   ];
 
-  const surfaceType = config.surfaceType || "concave";
-  const surfaceStart = config.surfaceStart || "middle";
+  const upperSideWidth = chimneyDepth - ORDER_PANEL;
+  const upper = [
+    {
+      name: "上竖前挡板", w: chimneyWidth, h: chimneyHeight, kind: "rect",
+      outline: orderRectOutline(chimneyWidth, chimneyHeight),
+      size: `${Math.round(chimneyWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
+    },
+    {
+      name: "上竖左侧板", w: upperSideWidth, h: chimneyHeight, kind: "rect",
+      outline: orderRectOutline(upperSideWidth, chimneyHeight),
+      size: `${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
+    },
+    {
+      name: "上竖右侧板", w: upperSideWidth, h: chimneyHeight, kind: "rect",
+      outline: orderRectOutline(upperSideWidth, chimneyHeight),
+      size: `${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
+    },
+  ];
+
   let transition = [];
-  if (surfaceType !== "none") {
-    const fraction = surfaceType === "convex"
-      ? (surfaceStart === "lowest" ? 0.28 : 0.4)
-      : (surfaceStart === "top" ? 1 : 0.5);
-    const transitionHeight = Math.max(60, Math.round(chimneyHeight * fraction));
-    const kind = surfaceType === "flat" ? "rect" : "curve";
+  if (metrics.surfaceType !== "none") {
+    const front = orderTransitionOutline(metrics, false);
+    const side = orderTransitionOutline(metrics, true);
+    const prefix = metrics.surfaceType === "flat" ? "过渡" : "曲面";
     transition = [
-      { name: surfaceType === "flat" ? "过渡前片" : "曲面前片", w: hoodWidth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodWidth} × ${transitionHeight}mm`, note: "展开示意" },
-      { name: surfaceType === "flat" ? "过渡左片" : "曲面左片", w: hoodDepth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodDepth} × ${transitionHeight}mm`, note: "展开示意" },
-      { name: surfaceType === "flat" ? "过渡右片" : "曲面右片", w: hoodDepth, h: transitionHeight, kind, surface: surfaceType, size: `${hoodDepth} × ${transitionHeight}mm`, note: "展开示意" },
+      {
+        name: `${prefix}前片`, w: front.w, h: front.h, kind: "curve", outline: front.outline,
+        size: `展开 ${Math.round(front.w)} × ${Math.round(front.h)}mm`,
+        note: `上宽 ${Math.round(front.topWidth)} / 下宽 ${Math.round(front.bottomWidth)} · 3D 展开`,
+      },
+      {
+        name: `${prefix}左片`, w: side.w, h: side.h, kind: "curve", outline: side.outline,
+        size: `展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,
+        note: `上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,
+      },
+      {
+        name: `${prefix}右片`, w: side.w, h: side.h, kind: "curve", outline: side.outline,
+        size: `展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,
+        note: `上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,
+      },
     ];
   }
 
-  const shims = shimHeight > 0
-    ? [{ name: "垫板", w: hoodWidth, h: hoodDepth, kind: "rect", size: `${hoodWidth} × ${hoodDepth}mm`, note: `厚 ${shimHeight}mm` }]
+  const shims = metrics.shim > 0
+    ? [
+        {
+          name: "左垫板", w: topDepth, h: metrics.shim, kind: "shim",
+          outline: orderRectOutline(topDepth, metrics.shim),
+          size: `${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,
+          note: "左右各一 · 5mm 板",
+        },
+        {
+          name: "右垫板", w: topDepth, h: metrics.shim, kind: "shim",
+          outline: orderRectOutline(topDepth, metrics.shim),
+          size: `${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,
+          note: "左右各一 · 5mm 板",
+        },
+      ]
     : [];
 
   const groups = [
@@ -2109,12 +2329,16 @@ function buildOrderDrawingGroups(config) {
     { id: "upper", title: "上竖", parts: orderDrawingSort(upper) },
   ];
   if (transition.length) {
-    groups.push({ id: "curve", title: surfaceType === "flat" ? "过渡面" : "曲面", parts: orderDrawingSort(transition) });
+    groups.push({
+      id: "curve",
+      title: metrics.surfaceType === "flat" ? "过渡面" : "曲面",
+      parts: orderDrawingSort(transition),
+    });
   }
   if (shims.length) {
     groups.push({ id: "shim", title: "垫高", parts: orderDrawingSort(shims) });
   }
-  const trims = orderTrimParts(config);
+  const trims = orderTrimParts(config, metrics);
   if (trims.length) {
     const total = trims.reduce((sum, part) => sum + part.count, 0);
     groups.push({
@@ -2124,6 +2348,12 @@ function buildOrderDrawingGroups(config) {
       summary: `共 ${total} 根 · ${trims.length} 个位置`,
     });
   }
+  // 所有平板/曲面部件共用一个缩放比例，跨 Tab 也能直接比较大小；装饰条是截面示意。
+  const panelParts = groups.flatMap((group) => group.parts).filter((part) => Array.isArray(part.outline));
+  const globalScale = orderGroupScale(panelParts);
+  groups.forEach((group) => {
+    group.scale = group.id === "trim" ? 1 : globalScale;
+  });
   return groups;
 }
 
@@ -2224,13 +2454,16 @@ function openOrderDrawing() {
     nav.querySelectorAll("button").forEach((button) => {
       button.setAttribute("aria-selected", String(button.dataset.drawingTab === group.id));
     });
+    const note = group.id === "trim"
+      ? "装饰条图标为实际截面示意，长度和根数见尺寸标注；精确下料以工厂图纸为准。"
+      : "所有平板和曲面部件共用同一个比例，按 3D 外罩实际尺寸绘制（含 5mm 板厚与安装间隙）；曲面部件的展开高度为曲面弧长。精确下料以工厂图纸为准。";
     panel.innerHTML = `
       <div class="drawing-meta">
-        <span>${esc(group.summary || `共 ${group.parts.length} 件`)}</span>
-        <span>单位 mm</span>
+        <span>${esc(group.summary || `共 ${group.parts.length} 件`)}${group.id === "trim" ? "" : " · 全图等比"}</span>
+        <span>实际下料 · mm</span>
       </div>
-      <div class="drawing-row">${group.parts.map(orderDrawingTile).join("")}</div>
-      <p class="drawing-note">展开图为示意，实际下料以工厂图纸为准。</p>
+      <div class="drawing-row">${group.parts.map((part) => orderDrawingTile(part, group.scale)).join("")}</div>
+      <p class="drawing-note">${esc(note)}</p>
     `;
   };
 
