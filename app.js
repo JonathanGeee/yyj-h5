@@ -2175,11 +2175,14 @@ function orderTrimParts(config, metrics) {
     const isHood = position.key === "hoodTop" || position.key === "hoodBottom";
     const front = isHood ? metrics.width : metrics.chimneyWidth;
     const side = isHood ? metrics.depth : metrics.chimneyDepth;
+    const bottomSide = position.key === "hoodBottom"
+      ? Math.hypot(metrics.bottomFrontY, metrics.depth)
+      : side;
     let count = 3;
     let size = `3 根 · 正面 ${Math.round(front)} / 侧 ${Math.round(side)}mm`;
     if (position.key === "hoodBottom" && metrics.notchEnabled) {
       count = 5;
-      size = `5 根 · 两侧 ${Math.round(side)} + 正面分 3 段`;
+      size = `5 根 · 两侧 ${Math.round(bottomSide)} + 正面分 3 段`;
     }
     return [{
       name: `${position.name}装饰条`,
