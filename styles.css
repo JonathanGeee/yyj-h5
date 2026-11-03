@@ -1924,6 +1924,7 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 .case-track::-webkit-scrollbar { display: none; }
 .case-track { cursor: grab; }
@@ -2156,6 +2157,12 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   background: var(--green);
   font-size: 14px;
   font-weight: 650;
+}
+
+/* 统一去掉按钮投影，保持界面干净 */
+button,
+.order-detail-actions {
+  box-shadow: none !important;
 }
 
 @media (max-width: 360px) {

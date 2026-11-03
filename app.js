@@ -18,42 +18,42 @@ const PREVIEW_MODULE_URL = "./preview.js?v=20261103-3";
 
 const STYLES = [
   {
-    id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 双层收边",
+    id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 宽底收边",
     curve: "concave", start: "middle",
     dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 390, frontHeight: 255, chimneyWidth: 500, chimneyDepth: 330, chimneyHeight: 680 },
     trims: { top: "corner", start: "single", hoodTop: "corner", hoodBottom: "single" },
     notch: { shape: "rounded", width: 300, height: 60, offset: 0 },
   },
   {
-    id: "tall", name: "高窄弧", tone: "暖米", desc: "窄身长弧 · 顶部起弧",
+    id: "tall", name: "高窄弧", tone: "暖米", desc: "高窄长弧 · 拱形开口",
     curve: "concave", start: "top",
     dims: { hoodWidth: 800, hoodDepth: 470, rearHeight: 380, frontHeight: 260, chimneyWidth: 280, chimneyDepth: 300, chimneyHeight: 500 },
     trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
     notch: { shape: "arch", width: 340, height: 90, offset: 0 },
   },
   {
-    id: "line", name: "直边塔", tone: "暖米", desc: "直边收分 · 单线压顶",
+    id: "line", name: "直边塔", tone: "暖米", desc: "直边斜收 · 方冠压顶",
     curve: "flat", start: "middle",
     dims: { hoodWidth: 940, hoodDepth: 500, rearHeight: 330, frontHeight: 220, chimneyWidth: 480, chimneyDepth: 330, chimneyHeight: 620 },
     trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
     notch: { shape: "trapezoid", width: 340, height: 60, offset: 0 },
   },
   {
-    id: "arch", name: "圆顶拱", tone: "暖米", desc: "窄身长弧 · 大圆拱口",
+    id: "arch", name: "圆顶拱", tone: "暖米", desc: "长弧外扩 · 大圆拱口",
     curve: "concave", start: "top",
     dims: { hoodWidth: 840, hoodDepth: 480, rearHeight: 400, frontHeight: 280, chimneyWidth: 300, chimneyDepth: 310, chimneyHeight: 520 },
     trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
     notch: { shape: "arch", width: 460, height: 120, offset: 0 },
   },
   {
-    id: "crown", name: "宽方冠", tone: "暖米", desc: "宽肩方冠 · 台阶压顶",
+    id: "crown", name: "宽方冠", tone: "暖米", desc: "宽肩直边 · 阶梯方冠",
     curve: "flat", start: "middle",
     dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 440, chimneyDepth: 330, chimneyHeight: 560 },
     trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
     notch: { shape: "trapezoid", width: 320, height: 90, offset: 0 },
   },
   {
-    id: "float", name: "极简方盒", tone: "暖米", desc: "无侧面 · 干净直边",
+    id: "float", name: "极简方盒", tone: "暖米", desc: "方盒直边 · 无弧侧面",
     curve: "none", start: "middle",
     dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 300, frontHeight: 220, chimneyWidth: 600, chimneyDepth: 380, chimneyHeight: 680 },
     trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
@@ -330,7 +330,7 @@ function notchArt(shape) {
   const outlines = {
     rect: "M2 3H118V33H80V20H40V33H2Z",
     rounded: "M2 3H118V33H80V24Q80 20 75 20H45Q40 20 40 24V33H2Z",
-    arch: "M2 3H118V33H80V25A20 12 0 0 0 40 25V33H2Z",
+    arch: "M2 3H118V33H80A22 22 0 0 0 40 33H2Z",
     trapezoid: "M2 3H118V33H82L74 20H46L38 33H2Z",
   };
   return `<svg viewBox="0 0 120 36" aria-hidden="true">
@@ -781,6 +781,7 @@ let caseScrollTarget = null;
 let caseScrollTimer = 0;
 let caseSwipeTimer = 0;
 let suppressCaseScroll = false;
+let caseInteracting = false;
 let caseThumbApi = null;
 let caseThumbLoading = false;
 let caseThumbFailed = false;
@@ -1094,17 +1095,28 @@ let caseSettleTimer = 0;
 function normalizeCaseScroll() {
   const track = $("#caseTrack");
   const count = HOME_CASES.length;
-  if (!track || count < 2) return;
+  if (!track || count < 2 || caseInteracting || suppressCaseScroll) return;
   const position = virtualCasePosition();
   const nearest = Math.round(position);
-  if (Math.abs(position - nearest) > 0.02) return;
+  // 必须真正停在克隆页上（约 1px 内）才跳回真实页；滑动途中跳会闪一下。
+  if (Math.abs(position - nearest) > 0.002) return;
+  let target = 0;
   if (nearest <= 0) {
-    // 左侧克隆（末张）→ 真实末张
-    track.scrollLeft = count * track.clientWidth;
+    target = count * track.clientWidth;
   } else if (nearest >= count + 1) {
-    // 右侧克隆（首张）→ 真实首张
-    track.scrollLeft = track.clientWidth;
+    target = track.clientWidth;
+  } else {
+    return;
   }
+  // 跳转时临时关掉 scroll-snap 和滚动动画，避免浏览器把这次瞬移又做成一段滚动。
+  const snap = track.style.scrollSnapType;
+  const behavior = track.style.scrollBehavior;
+  track.style.scrollSnapType = "none";
+  track.style.scrollBehavior = "auto";
+  track.scrollLeft = target;
+  void track.offsetWidth;
+  track.style.scrollSnapType = snap;
+  track.style.scrollBehavior = behavior;
 }
 
 function scheduleCaseNormalize() {
@@ -1177,7 +1189,7 @@ function bindCaseEvents() {
     if (suppressCaseScroll) return;
     const index = realCaseIndex(Math.round(virtualCasePosition()));
     updateCaseProgress(index);
-    scheduleCaseNormalize();
+    if (!caseInteracting) scheduleCaseNormalize();
     if (caseScrollTarget !== null) {
       if (index === caseScrollTarget) clearCaseScrollTarget();
       return;
@@ -1186,12 +1198,13 @@ function bindCaseEvents() {
   }, { passive: true });
   const syncCaseAfterSwipe = () => {
     clearTimeout(caseSwipeTimer);
+    caseInteracting = false;
     let attempts = 0;
     const settle = () => {
       const position = virtualCasePosition();
       const nearest = nearestVirtualCase();
       // 惯性还没停就先等一等，别把「滑到下一张」的动画打断。
-      if (Math.abs(position - nearest) > 0.02 && attempts++ < 20) {
+      if (Math.abs(position - nearest) > 0.002 && attempts++ < 20) {
         caseSwipeTimer = window.setTimeout(settle, 120);
         return;
       }
@@ -1205,10 +1218,12 @@ function bindCaseEvents() {
   };
   track.addEventListener("touchstart", () => {
     clearTimeout(caseSwipeTimer);
+    caseInteracting = true;
     clearCaseScrollTarget();
     pauseCaseAuto();
   }, { passive: true });
   track.addEventListener("touchend", syncCaseAfterSwipe, { passive: true });
+  track.addEventListener("touchcancel", syncCaseAfterSwipe, { passive: true });
 
   // 桌面端：按住鼠标左右拖动也能切换（触屏仍走原生滚动）
   let dragging = false;
@@ -1217,6 +1232,7 @@ function bindCaseEvents() {
   let dragStartScroll = 0;
   track.addEventListener("pointerdown", (event) => {
     clearTimeout(caseSwipeTimer);
+    caseInteracting = true;
     clearCaseScrollTarget();
     pauseCaseAuto();
     if (event.pointerType !== "mouse" || event.button !== 0) return;
@@ -1233,6 +1249,7 @@ function bindCaseEvents() {
     track.scrollLeft = dragStartScroll - dx;
   });
   const endDrag = () => {
+    caseInteracting = false;
     if (!dragging) return;
     dragging = false;
     track.classList.remove("is-dragging");
@@ -1251,7 +1268,10 @@ function bindCaseEvents() {
   });
   $("#homeStart")?.addEventListener("click", startWithActiveCase);
   $("#case3d")?.addEventListener("click", startWithActiveCase);
-  $("#homeOrders")?.addEventListener("click", () => go("orders"));
+  $("#homeOrders")?.addEventListener("click", () => {
+    resetOrderSearch();
+    go("orders");
+  });
 }
 
 function homeCaseSlides() {
@@ -1298,6 +1318,10 @@ function renderHomeCases() {
   caseModel.button?.setAttribute("aria-label", first ? `查看${first.name}的 3D 模型` : "查看 3D 模型");
   // 首页隐藏时 clientWidth 为 0，先标记；显示后由 ensureCaseTrackPosition 定位到真实首张。
   track.scrollLeft = HOME_CASES.length > 1 ? track.clientWidth : 0;
+  // 预热所有案例大图（含首尾克隆），避免循环到克隆页时出现一帧空白/闪烁。
+  $$(".case-slide img").forEach((image) => {
+    if (typeof image.decode === "function") image.decode().catch(() => {});
+  });
   preloadCaseModels();
   bindCaseEvents();
   updateCaseProgress(0);
@@ -1889,12 +1913,16 @@ async function searchOrders(value) {
   renderOrderResults(orders);
 }
 
-function renderOrdersPage() {
+function resetOrderSearch() {
   const phoneInput = $("#orderPhone");
-  if (phoneInput && !phoneInput.value) {
-    const saved = readStored(STORAGE.customer, null);
-    if (saved?.phone) phoneInput.value = normalizePhone(saved.phone);
-  }
+  if (phoneInput) phoneInput.value = "";
+  const results = $("#orderResults");
+  if (results) results.innerHTML = "";
+  orderSearchToken++;
+}
+
+function renderOrdersPage() {
+  // 手机号默认为空，让用户自己输入；不再从本地缓存回填。
 }
 
 function orderDetailNumber(value, fallback) {
@@ -2865,17 +2893,21 @@ function openHelp(kind) {
     shim: {
       title: "垫高",
       body: `${art(`<svg viewBox="0 0 320 132">
-        <path d="M30 12v108" stroke="#ddd2c2" stroke-width="1.2" stroke-dasharray="4 4"/>
-        <rect x="58" y="14" width="204" height="60" rx="5" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.3"/>
-        <rect x="74" y="74" width="172" height="16" rx="3" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
-        <rect x="70" y="90" width="180" height="30" rx="3" fill="#e7e3db" stroke="#b7b1a6" stroke-width="1.2"/>
-        <text x="160" y="48" text-anchor="middle" font-size="9" fill="#7a6248">装饰罩</text>
-        <text x="160" y="86" text-anchor="middle" font-size="9" font-weight="600" fill="#7a5a35">垫高</text>
-        <text x="160" y="110" text-anchor="middle" font-size="9" fill="#777a72">油烟机</text>
-        <path d="M286 72V44" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
-        <path d="M280 50l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="298" y="62" font-size="8" fill="#245c45">抬高</text>
-      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
+        <path d="M30 12v110" stroke="#ddd2c2" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <rect x="56" y="26" width="208" height="7" rx="2" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.3"/>
+        <rect x="56" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
+        <rect x="257" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
+        <rect x="70" y="33" width="24" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
+        <rect x="226" y="33" width="24" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
+        <rect x="63" y="70" width="194" height="34" rx="3" fill="#e7e3db" stroke="#b7b1a6" stroke-width="1.2"/>
+        <text x="160" y="21" text-anchor="middle" font-size="8" fill="#7a6248">定制罩</text>
+        <text x="82" y="55" text-anchor="middle" font-size="8" fill="#6b4f2f">垫高</text>
+        <text x="238" y="55" text-anchor="middle" font-size="8" fill="#6b4f2f">垫高</text>
+        <text x="160" y="90" text-anchor="middle" font-size="9" fill="#777a72">油烟机</text>
+        <path d="M286 64V40" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M280 46l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="298" y="56" font-size="8" fill="#245c45">抬高</text>
+      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。垫板分左右两块装在罩体内部。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
     },
     install: {
       title: "安装小贴士",
