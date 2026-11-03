@@ -459,13 +459,17 @@ function normalizeState() {
 
 const currentStyle = () => STYLES.find((style) => style.id === state.styleId) || STYLES[0];
 const trimFor = (key) => TRIMS.find((trim) => trim.id === (state.trimStyles?.[key] || "none")) || TRIMS[0];
-function priceInfo() {
-  const details = activeTrimPositions().map((position) => {
-    const trim = trimFor(position.key);
+function priceInfoFor(config = state) {
+  const details = activeTrimPositions(config).map((position) => {
+    const styleId = config.trimStyles?.[position.key] || "none";
+    const trim = TRIMS.find((item) => item.id === styleId) || TRIMS[0];
     return { ...position, styleId: trim.id, styleName: trim.name, price: trim.price };
   });
   const trim = details.reduce((sum, item) => sum + item.price, 0);
   return { base: CONFIG.basePrice, trim, total: CONFIG.basePrice + trim, details };
+}
+function priceInfo() {
+  return priceInfoFor(state);
 }
 // 下单页展示的划线价：总价的 140%。
 const listPrice = (total) => Math.round(Number(total) * 1.4);
@@ -1753,28 +1757,32 @@ function sumRow(label, value) {
   return `<div class="sum-row"><span>${label}</span><b>${esc(value)}</b></div>`;
 }
 
+function summaryRowsFor(config = state, styleLabel = "") {
+  const style = STYLES.find((entry) => entry.id === config.styleId) || STYLES[0];
+  const start = startLabelFor(config.surfaceType, config.surfaceStart);
+  const curveLabel = config.surfaceType === "none"
+    ? "无侧面"
+    : config.surfaceType === "flat"
+      ? `不弯曲 · ${start}`
+      : `${config.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
+  return [
+    ["款式", styleLabel || `${style.name} · ${style.tone}`],
+    ["下横", `${config.hoodWidth} × ${config.hoodDepth}mm`],
+    ["侧高", `靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`],
+    ["上竖", `${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`],
+    ["侧面", curveLabel],
+    ["装饰条", trimSummaryShort(config)],
+    ["垫高", `${config.shimHeight}mm`],
+  ];
+}
+
 function renderCheckoutSummary() {
   const summary = $("#orderSummary");
   const fees = $("#orderFees");
   if (!summary && !fees) return;
-  const style = currentStyle();
   const price = priceInfo();
-  const start = startLabelFor(state.surfaceType, state.surfaceStart);
-  const curveLabel = state.surfaceType === "none"
-    ? "无侧面"
-    : state.surfaceType === "flat"
-      ? `不弯曲 · ${start}`
-      : `${state.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
   if (summary) {
-    summary.innerHTML = [
-      sumRow("款式", `${style.name} · ${style.tone}`),
-      sumRow("下横", `${state.hoodWidth} × ${state.hoodDepth}mm`),
-      sumRow("侧高", `靠墙 ${state.rearHeight} / 前侧 ${state.frontHeight}mm`),
-      sumRow("上竖", `${state.chimneyWidth} × ${state.chimneyDepth} × ${state.chimneyHeight}mm`),
-      sumRow("侧面", curveLabel),
-      sumRow("装饰条", trimSummaryShort(state)),
-      sumRow("垫高", `${state.shimHeight}mm`),
-    ].join("");
+    summary.innerHTML = summaryRowsFor(state).map(([label, value]) => sumRow(label, value)).join("");
   }
   if (fees) {
     fees.innerHTML = [
@@ -2394,31 +2402,67 @@ function renderOrderDetail() {
     return;
   }
   const order = activeOrder;
-  const config = order.config || {};
+  const orderConfig = orderInstallConfig(order);
   const status = orderStatus(order);
-  const style = [order.style?.name, order.style?.tone].filter(Boolean).join(" · ");
-  const rows = [
+  const styleEntry = STYLES.find((entry) => entry.id === orderConfig.styleId) || STYLES[0];
+  const styleLabel = [
+    order.style?.name || styleEntry.name,
+    order.style?.tone || styleEntry.tone,
+  ].filter(Boolean).join(" · ");
+  const customer = order.customer || {};
+  const shippingRows = [
+    ["收货人", customer.name || "—"],
+    ["手机号", customer.phone || "—"],
+    ["所在地区", customer.region || "—"],
+    ["详细地址", customer.address || "—"],
+  ];
+  const infoRows = [
+    ["订单编号", order.id || "—"],
     ["下单时间", formatOrderDate(order.createdAt)],
-    ["款式", style],
-    config.hoodWidth ? ["下横", `${config.hoodWidth} × ${config.hoodDepth}mm`] : null,
-    config.rearHeight ? ["侧高", `靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`] : null,
-    config.chimneyWidth ? ["上竖", `${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`] : null,
-  ].filter(Boolean);
+    ...summaryRowsFor(orderConfig, styleLabel),
+  ];
+  const computedPrice = priceInfoFor(orderConfig);
+  const storedPrice = order.price || {};
+  const storedBase = storedPrice.base == null ? NaN : Number(storedPrice.base);
+  const storedTrim = storedPrice.trim == null ? NaN : Number(storedPrice.trim);
+  const storedTotal = storedPrice.total == null ? NaN : Number(storedPrice.total);
+  const hasBreakdown = Number.isFinite(storedBase) && Number.isFinite(storedTrim);
+  const base = hasBreakdown ? storedBase : computedPrice.base;
+  const trim = hasBreakdown ? storedTrim : computedPrice.trim;
+  const total = Number.isFinite(storedTotal)
+    ? storedTotal
+    : hasBreakdown ? storedBase + storedTrim : computedPrice.total;
 
   disposeOrderPreview();
   root.innerHTML = `
     <section class="order-model-hero" aria-label="订单 3D 模型">
       <div class="order-model-stage" id="orderModelStage"></div>
     </section>
-    <section class="order-detail-card">
-      <div class="order-detail-head">
-        <b>${esc(order.id || "—")}</b>
+    <section class="order-card">
+      <div class="order-card-head"><h2>收货信息</h2></div>
+      ${shippingRows.map(([label, value]) => sumRow(label, value)).join("")}
+    </section>
+    <section class="order-card">
+      <div class="order-card-head">
+        <h2>订单信息</h2>
         <span class="order-status ${status.className}">${status.text}</span>
       </div>
-      ${rows.map(([label, value]) => `<div class="order-detail-row"><span>${esc(label)}</span><b>${esc(value)}</b></div>`).join("")}
-      <div class="order-detail-total"><span>合计</span><b>${fmt(order.price?.total ?? 0)}</b></div>
-      <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
+      ${infoRows.map(([label, value]) => sumRow(label, value)).join("")}
     </section>
+    <section class="order-card">
+      <div class="order-card-head"><h2>费用明细</h2></div>
+      ${hasBreakdown ? sumRow("主体", fmt(base)) + sumRow("装饰", fmt(trim)) : ""}
+      <div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>
+      <div class="order-total">
+        <span>合计</span>
+        <div class="order-total-prices">
+          <s>${fmt(listPrice(total))}</s>
+          <b>${fmt(total)}</b>
+        </div>
+      </div>
+      ${hasBreakdown ? "" : `<p class="order-fee-note">该订单未保存主体/装饰拆分，以合计金额为准。</p>`}
+    </section>
+    <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
     <section class="order-detail-service">
       <p class="order-detail-service-title">有问题？加客服微信</p>
       ${(CONFIG.serviceQrImage || CONFIG.qrImage) ? `<img class="order-detail-qr" src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}" alt="客服微信二维码" />` : ""}
@@ -2426,7 +2470,7 @@ function renderOrderDetail() {
     </section>
   `;
 
-  mountOrderPreview(orderInstallConfig(order));
+  mountOrderPreview(orderConfig);
 }
 
 function openOrderDrawing() {
