@@ -1650,6 +1650,12 @@ input[type="range"] { width: 100%; height: 24px; margin: 0; accent-color: var(--
   visibility: visible;
   pointer-events: none;
 }
+/* 反向动画期间先藏起小图自己的模型，只保留卡片和标签，
+ * 避免和正在缩回去的大模型同时出现两个。动画结束换回首页时再瞬间显示。 */
+.view[data-view="home"].is-hero-reverse-home .case-3d-canvas,
+.view[data-view="home"].is-hero-reverse-home .case-3d-flipper {
+  visibility: hidden;
+}
 .view--customize.is-hero-reverse {
   background: transparent;
   transition: background-color 0.3s ease;
