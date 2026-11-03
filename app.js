@@ -1,282 +1,19 @@
-/* 烟罩实验室 H5
- * 所有价格、微信号、收款码和后台地址都集中在 CONFIG，改这里即可。
- */
-const CONFIG = {
-  basePrice: 480,
-  trimPrices: { none: 0, single: 35, corner: 45 },
-  wechatId: "Jonathan_Ge",
-  qrImage: "assets/pay-qr.jpg",
-  serviceQrImage: "assets/service-qr.jpg",
-  orderEndpoint: location.hostname.endsWith("github.io")
-    ? "https://yyj-h5-d5gaovp196680d93f-1258663924.ap-shanghai.app.tcloudbase.com/api/orders"
-    : "/api/orders",
-};
-
-// preview.js 会被浏览器按 URL 缓存；改动 preview.js 时同步更新这里的版本号，
-// 避免首页拿不到新的 3D 接口而退化成普通跳转。
-const PREVIEW_MODULE_URL = "./preview.js?v=20261103-3";
-
-const STYLES = [
-  {
-    id: "cloud", name: "云朵弧", tone: "暖米", desc: "钟形弧线 · 宽底收边",
-    curve: "concave", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 390, frontHeight: 255, chimneyWidth: 500, chimneyDepth: 330, chimneyHeight: 680 },
-    trims: { top: "corner", start: "single", hoodTop: "corner", hoodBottom: "single" },
-    notch: { shape: "rounded", width: 300, height: 60, offset: 0 },
-  },
-  {
-    id: "tall", name: "高窄弧", tone: "暖米", desc: "高窄长弧 · 拱形开口",
-    curve: "concave", start: "top",
-    dims: { hoodWidth: 800, hoodDepth: 470, rearHeight: 380, frontHeight: 260, chimneyWidth: 280, chimneyDepth: 300, chimneyHeight: 500 },
-    trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "arch", width: 340, height: 90, offset: 0 },
-  },
-  {
-    id: "line", name: "直边塔", tone: "暖米", desc: "直边斜收 · 方冠压顶",
-    curve: "flat", start: "middle",
-    dims: { hoodWidth: 940, hoodDepth: 500, rearHeight: 330, frontHeight: 220, chimneyWidth: 480, chimneyDepth: 330, chimneyHeight: 620 },
-    trims: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-    notch: { shape: "trapezoid", width: 340, height: 60, offset: 0 },
-  },
-  {
-    id: "arch", name: "圆顶拱", tone: "暖米", desc: "长弧外扩 · 大圆拱口",
-    curve: "concave", start: "top",
-    dims: { hoodWidth: 840, hoodDepth: 480, rearHeight: 400, frontHeight: 280, chimneyWidth: 300, chimneyDepth: 310, chimneyHeight: 520 },
-    trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
-    notch: { shape: "arch", width: 460, height: 120, offset: 0 },
-  },
-  {
-    id: "crown", name: "宽方冠", tone: "暖米", desc: "宽肩直边 · 阶梯方冠",
-    curve: "flat", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 510, rearHeight: 390, frontHeight: 260, chimneyWidth: 440, chimneyDepth: 330, chimneyHeight: 560 },
-    trims: { top: "corner", start: "none", hoodTop: "corner", hoodBottom: "single" },
-    notch: { shape: "trapezoid", width: 320, height: 90, offset: 0 },
-  },
-  {
-    id: "float", name: "极简方盒", tone: "暖米", desc: "方盒直边 · 无弧侧面",
-    curve: "none", start: "middle",
-    dims: { hoodWidth: 1000, hoodDepth: 500, rearHeight: 300, frontHeight: 220, chimneyWidth: 600, chimneyDepth: 380, chimneyHeight: 680 },
-    trims: { top: "corner", start: "none", hoodTop: "single", hoodBottom: "single" },
-    notch: { enabled: false, shape: "rect", width: 260, height: 50, offset: 90 },
-  },
-];
-
-// 首页案例：大图先用原来的 3D 渲染占位，之后换成 AI 实景图。
-// model 是右下角「3D 模型」小图；这里指向带独立豁口/比例的新模型。
-const HOME_CASES = [
-  { styleId: "cloud", name: "云朵弧", image: "assets/styles/cloud.jpg", model: "assets/models/cloud.png", fit: "cover" },
-  { styleId: "line", name: "直边塔", image: "assets/styles/line.jpg", model: "assets/models/line.png", fit: "cover" },
-  { styleId: "tall", name: "高窄弧", image: "assets/styles/tall.jpg", model: "assets/models/tall.png", fit: "cover" },
-  { styleId: "arch", name: "圆顶拱", image: "assets/styles/arch.jpg", model: "assets/models/arch.png", fit: "cover" },
-  { styleId: "crown", name: "宽方冠", image: "assets/styles/crown.jpg", model: "assets/models/crown.png", fit: "cover" },
-  { styleId: "float", name: "极简方盒", image: "assets/styles/float.jpg", model: "assets/models/float.png", fit: "cover" },
-];
-// 3D 小图的全局兜底；每个案例自己的 model 优先。
-let HOME_3D_IMAGE = "";
-
-/* 线上可替换的内容：content.json 不存在或加载失败时，保留上面的默认值。 */
-async function loadSiteContent() {
-  try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 1500);
-    const response = await fetch(`content.json?v=${Date.now()}`, { cache: "no-store", signal: controller.signal });
-    clearTimeout(timer);
-    if (!response.ok) return;
-    const data = await response.json();
-    if (data && data.wechatId) CONFIG.wechatId = String(data.wechatId);
-    if (data && data.qrImage) CONFIG.qrImage = String(data.qrImage);
-    if (data && data.serviceQrImage) CONFIG.serviceQrImage = String(data.serviceQrImage);
-    if (data && Number.isFinite(Number(data.basePrice))) CONFIG.basePrice = Number(data.basePrice);
-    if (data && data.trimPrices && typeof data.trimPrices === "object") {
-      Object.keys(CONFIG.trimPrices).forEach((key) => {
-        if (Number.isFinite(Number(data.trimPrices[key]))) CONFIG.trimPrices[key] = Number(data.trimPrices[key]);
-      });
-    }
-    if (data && Array.isArray(data.cases) && data.cases.length) {
-      const cases = data.cases
-        .filter((item) => item && item.styleId && item.image)
-        .map((item) => ({
-          styleId: String(item.styleId),
-          name: String(item.name || ""),
-          image: String(item.image),
-          model: item.model ? String(item.model) : "",
-          fit: item.fit === "cover" ? "cover" : "contain",
-        }));
-      if (cases.length) {
-        HOME_CASES.length = 0;
-        HOME_CASES.push(...cases);
-      }
-    }
-    if (data && data.home3dImage) HOME_3D_IMAGE = String(data.home3dImage);
-  } catch { /* 使用内置默认内容 */ }
-}
-
-const TRIMS = [
-  { id: "none", name: "无装饰条", desc: "干净利落", price: 0 },
-  { id: "single", name: "半圆线条", desc: "半圆细边", price: 35 },
-  { id: "corner", name: "顶角条", desc: "直角收边", price: 45 },
-];
-
-const TRIM_POSITIONS = [
-  { key: "top", name: "烟道顶部", hint: "烟道最上方一圈" },
-  { key: "start", name: "曲面起点", hint: "上竖与曲面的接缝" },
-  { key: "hoodTop", name: "下横顶边", hint: "下横上沿" },
-  { key: "hoodBottom", name: "下横底边", hint: "下横下沿" },
-];
-
-const DIMS = {
-  chimneyWidth: { label: "烟道宽", hint: "左右各留 5mm", min: 220, max: 600, step: 10 },
-  chimneyDepth: { label: "烟道深", hint: "从墙到前外沿", min: 180, max: 500, step: 10 },
-  chimneyHeight: { label: "上竖高", hint: "下横以上", min: 300, max: 1000, step: 10 },
-  hoodWidth: { label: "烟机宽", hint: "量最外沿", min: 600, max: 1100, step: 10 },
-  hoodDepth: { label: "烟机深", hint: "从墙到最外沿", min: 350, max: 650, step: 10 },
-  rearHeight: { label: "靠墙侧高", hint: "贴墙那一侧", min: 220, max: 520, step: 10 },
-  frontHeight: { label: "前侧高", hint: "朝外这一侧", min: 120, max: 520, step: 10 },
-  notchWidth: { label: "开口宽", hint: "豁口左右宽度", min: 120, max: 620, step: 10 },
-  notchHeight: { label: "开口高", hint: "从底边往上", min: 30, max: 220, step: 10 },
-};
-
-const NOTCH_SHAPES = [
-  { id: "rect", label: "矩形" },
-  { id: "rounded", label: "圆角矩形" },
-  { id: "arch", label: "圆弧" },
-  { id: "trapezoid", label: "梯形" },
-];
-
-// 每个尺寸项对应的相机视角（preview.js 里的 viewPreset）
-const DIM_VIEW = {
-  chimneyWidth: "front",
-  chimneyDepth: "side",
-  chimneyHeight: "chimneyHeight",
-  hoodWidth: "hoodWidth",
-  hoodDepth: "hoodDepth",
-  rearHeight: "rearHeight",
-  frontHeight: "frontHeight",
-  notchWidth: "notch",
-  notchHeight: "notch",
-};
-
-const DEFAULTS = {
-  styleId: "cloud",
-  hoodWidth: 800, hoodDepth: 450, rearHeight: 380, frontHeight: 240,
-  chimneyWidth: 320, chimneyDepth: 280, chimneyHeight: 500,
-  shimHeight: 0, surfaceType: "concave", surfaceStart: "middle",
-  notchEnabled: true, notchShape: "arch", notchWidth: 420, notchHeight: 80, notchOffset: 0,
-  trimStyles: { top: "corner", start: "single", hoodTop: "single", hoodBottom: "single" },
-};
-
-const CURVES = [
-  { id: "concave", label: "向内弯曲" },
-  { id: "convex", label: "向外弯曲" },
-  { id: "flat", label: "不弯曲" },
-  { id: "none", label: "无侧面" },
-];
-
-function allowedStarts(type) {
-  if (type === "none") {
-    return [{ id: "middle", label: "中间" }];
-  }
-  if (type === "convex") {
-    return [{ id: "lower", label: "中间偏下" }, { id: "lowest", label: "中间更偏下" }];
-  }
-  if (type === "flat") {
-    return [{ id: "middle", label: "中间" }, { id: "top", label: "顶部" }];
-  }
-  return [{ id: "middle", label: "中间" }, { id: "top", label: "上面" }];
-}
-
-function startLabelFor(type = state.surfaceType, value = state.surfaceStart) {
-  if (value === "lowest") return "中间更偏下";
-  if (value === "lower") return "中间偏下";
-  if (value === "top") return type === "flat" ? "顶部" : "上面";
-  return "中间";
-}
-
-const STORAGE = {
-  customer: "yyj_customer",
-  orders: "yyj_orders",
-  pending: "yyj_pending_orders",
-  lastOrder: "yyj_last_order",
-  pendingOrder: "yyj_pending_order",
-};
-
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
-const fmt = (value) => `¥${Number(value).toLocaleString("zh-CN")}`;
-const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-function readStored(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeStored(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
-}
-function removeStored(key) {
-  try { localStorage.removeItem(key); } catch { /* ignore */ }
-}
-
-let artSeq = 0;
-function shade(hex, percent) {
-  const value = parseInt(hex.slice(1), 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  const target = percent < 0 ? 0 : 255;
-  const p = Math.abs(percent) / 100;
-  const to = (channel) => Math.round((target - channel) * p + channel).toString(16).padStart(2, "0");
-  return `#${to(r)}${to(g)}${to(b)}`;
-}
-
-const CURVE_CONTROLS = {
-  concave: { l1: [132, 140], l2: [86, 150], r1: [234, 150], r2: [188, 140] },
-  convex: { l1: [116, 124], l2: [52, 136], r1: [268, 136], r2: [204, 124] },
-};
-
-function hoodArt(style, { transparent = false } = {}) {
-  const uid = `hood${++artSeq}`;
-  const color = style.color;
-  const bg = style.bg;
-  const light = shade(color, 14);
-  const dark = shade(color, -10);
-  const edge = shade(color, -25);
-  const gold = "#d8be9e";
-  const controls = CURVE_CONTROLS[style.curve];
-  let frontTransition;
-  let sideTransition;
-  if (style.curve === "flat") {
-    frontTransition = "M132 112 L52 150 H268 L188 112 Z";
-    sideTransition = "M188 112 L268 150 L288 142 L204 103 Z";
-  } else {
-    const { l1, l2, r1, r2 } = controls;
-    frontTransition = `M132 112 C${l1[0]} ${l1[1]} ${l2[0]} ${l2[1]} 52 150 H268 C${r1[0]} ${r1[1]} ${r2[0]} ${r2[1]} 188 112 Z`;
-    sideTransition = `M188 112 C${r2[0]} ${r2[1]} ${r1[0]} ${r1[1]} 268 150 L288 142 C${r1[0] - 18} ${r1[1] - 8} ${r2[0] + 8} ${r2[1] - 8} 204 103 Z`;
-  }
-
-  const edges = [
-    "M132 38 H188 L204 31",
-    "M132 112 H188",
-    "M52 150 H268 L288 142",
-    "M52 196 H268 L288 188",
-  ];
-  let trims = "";
-  if (style.trim === "single" || style.trim === "corner") {
-    const width = style.trim === "corner" ? 6 : 4;
-    trims = edges.map((d) => `<path d="${d}" fill="none" stroke="${gold}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
-    if (style.trim === "corner") {
-      trims += edges.map((d) => `<path d="${d}" fill="none" stroke="#c9b08d" stroke-width="1.3" opacity=".3"/>`).join("");
-    }
-  } else if (style.trim === "double") {
-    trims = edges.map((d) => `<path d="${d}" fill="none" stroke="${gold}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
-    trims += edges.map((d) => `<path d="${d}" transform="translate(0 5)" fill="none" stroke="${gold}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
-  }
-
-  return `<svg viewBox="0 0 320 240" role="img" aria-label="${esc(style.name)}${esc(style.tone)}烟机罩示意">
+/* © 2026 栗子的家 · 定制装饰罩 | All rights reserved. */
+const CONFIG={basePrice:480,trimPrices:{none:0,single:35,corner:45},wechatId:"Jonathan_Ge",qrImage:"assets/pay-qr.jpg",serviceQrImage:"assets/service-qr.jpg",orderEndpoint:location.hostname.endsWith("github.io")?"https://yyj-h5-d5gaovp196680d93f-1258663924.ap-shanghai.app.tcloudbase.com/api/orders":"/api/orders",orderLookupEndpoint:"",};const PREVIEW_MODULE_URL="./preview.js?v=7c9d02b973";const STYLES=[{id:"cloud",name:"云朵弧",tone:"暖米",desc:"钟形弧线 · 宽底收边",curve:"concave",start:"middle",dims:{hoodWidth:1000,hoodDepth:500,rearHeight:390,frontHeight:255,chimneyWidth:500,chimneyDepth:330,chimneyHeight:680},trims:{top:"corner",start:"single",hoodTop:"corner",hoodBottom:"single"},notch:{shape:"rounded",width:300,height:60,offset:0},},{id:"tall",name:"高窄弧",tone:"暖米",desc:"高窄长弧 · 拱形开口",curve:"concave",start:"top",dims:{hoodWidth:800,hoodDepth:470,rearHeight:380,frontHeight:260,chimneyWidth:280,chimneyDepth:300,chimneyHeight:500},trims:{top:"corner",start:"none",hoodTop:"single",hoodBottom:"single"},notch:{shape:"arch",width:340,height:90,offset:0},},{id:"line",name:"直边塔",tone:"暖米",desc:"直边斜收 · 方冠压顶",curve:"flat",start:"middle",dims:{hoodWidth:940,hoodDepth:500,rearHeight:330,frontHeight:220,chimneyWidth:480,chimneyDepth:330,chimneyHeight:620},trims:{top:"corner",start:"single",hoodTop:"single",hoodBottom:"single"},notch:{shape:"trapezoid",width:340,height:60,offset:0},},{id:"arch",name:"圆顶拱",tone:"暖米",desc:"长弧外扩 · 大圆拱口",curve:"concave",start:"top",dims:{hoodWidth:840,hoodDepth:480,rearHeight:400,frontHeight:280,chimneyWidth:300,chimneyDepth:310,chimneyHeight:520},trims:{top:"corner",start:"none",hoodTop:"corner",hoodBottom:"single"},notch:{shape:"arch",width:460,height:120,offset:0},},{id:"crown",name:"宽方冠",tone:"暖米",desc:"宽肩直边 · 阶梯方冠",curve:"flat",start:"middle",dims:{hoodWidth:1000,hoodDepth:510,rearHeight:390,frontHeight:260,chimneyWidth:440,chimneyDepth:330,chimneyHeight:560},trims:{top:"corner",start:"none",hoodTop:"corner",hoodBottom:"single"},notch:{shape:"trapezoid",width:320,height:90,offset:0},},{id:"float",name:"极简方盒",tone:"暖米",desc:"方盒直边 · 无弧侧面",curve:"none",start:"middle",dims:{hoodWidth:1000,hoodDepth:500,rearHeight:300,frontHeight:220,chimneyWidth:600,chimneyDepth:380,chimneyHeight:680},trims:{top:"corner",start:"none",hoodTop:"single",hoodBottom:"single"},notch:{enabled:false,shape:"rect",width:260,height:50,offset:90},},];const HOME_CASES=[{styleId:"cloud",name:"云朵弧",image:"assets/styles/cloud.jpg",model:"assets/models/cloud.png",fit:"cover"},{styleId:"line",name:"直边塔",image:"assets/styles/line.jpg",model:"assets/models/line.png",fit:"cover"},{styleId:"tall",name:"高窄弧",image:"assets/styles/tall.jpg",model:"assets/models/tall.png",fit:"cover"},{styleId:"arch",name:"圆顶拱",image:"assets/styles/arch.jpg",model:"assets/models/arch.png",fit:"cover"},{styleId:"crown",name:"宽方冠",image:"assets/styles/crown.jpg",model:"assets/models/crown.png",fit:"cover"},{styleId:"float",name:"极简方盒",image:"assets/styles/float.jpg",model:"assets/models/float.png",fit:"cover"},];let HOME_3D_IMAGE="";async function loadSiteContent(){try{const controller=new AbortController();const timer=window.setTimeout(()=>controller.abort(),1500);const response=await fetch(`content.json?v=${Date.now()}`,{cache:"no-store",signal:controller.signal});clearTimeout(timer);if(!response.ok)return;const data=await response.json();if(data&&data.wechatId)CONFIG.wechatId=String(data.wechatId);if(data&&data.qrImage)CONFIG.qrImage=String(data.qrImage);if(data&&data.serviceQrImage)CONFIG.serviceQrImage=String(data.serviceQrImage);if(data&&Number.isFinite(Number(data.basePrice)))CONFIG.basePrice=Number(data.basePrice);if(data&&typeof data.orderLookupEndpoint==="string")CONFIG.orderLookupEndpoint=data.orderLookupEndpoint;if(data&&data.trimPrices&&typeof data.trimPrices==="object"){Object.keys(CONFIG.trimPrices).forEach((key)=>{if(Number.isFinite(Number(data.trimPrices[key])))CONFIG.trimPrices[key]=Number(data.trimPrices[key]);});}
+if(data&&Array.isArray(data.cases)&&data.cases.length){const cases=data.cases.filter((item)=>item&&item.styleId&&item.image).map((item)=>({styleId:String(item.styleId),name:String(item.name||""),image:String(item.image),model:item.model?String(item.model):"",fit:item.fit==="cover"?"cover":"contain",}));if(cases.length){HOME_CASES.length=0;HOME_CASES.push(...cases);}}
+if(data&&data.home3dImage)HOME_3D_IMAGE=String(data.home3dImage);}catch{}}
+const TRIMS=[{id:"none",name:"无装饰条",desc:"干净利落",price:0},{id:"single",name:"半圆线条",desc:"半圆细边",price:35},{id:"corner",name:"顶角条",desc:"直角收边",price:45},];const TRIM_POSITIONS=[{key:"top",name:"烟道顶部",hint:"烟道最上方一圈"},{key:"start",name:"曲面起点",hint:"上竖与曲面的接缝"},{key:"hoodTop",name:"下横顶边",hint:"下横上沿"},{key:"hoodBottom",name:"下横底边",hint:"下横下沿"},];const DIMS={chimneyWidth:{label:"烟道宽",hint:"左右各留 5mm",min:220,max:600,step:10},chimneyDepth:{label:"烟道深",hint:"从墙到前外沿",min:180,max:500,step:10},chimneyHeight:{label:"上竖高",hint:"下横以上",min:300,max:1000,step:10},hoodWidth:{label:"烟机宽",hint:"量最外沿",min:600,max:1100,step:10},hoodDepth:{label:"烟机深",hint:"从墙到最外沿",min:350,max:650,step:10},rearHeight:{label:"靠墙侧高",hint:"贴墙那一侧",min:220,max:520,step:10},frontHeight:{label:"前侧高",hint:"朝外这一侧",min:120,max:520,step:10},notchWidth:{label:"开口宽",hint:"豁口左右宽度",min:120,max:620,step:10},notchHeight:{label:"开口高",hint:"从底边往上",min:30,max:220,step:10},};const NOTCH_SHAPES=[{id:"rect",label:"矩形"},{id:"rounded",label:"圆角矩形"},{id:"arch",label:"圆弧"},{id:"trapezoid",label:"梯形"},];const DIM_VIEW={chimneyWidth:"front",chimneyDepth:"side",chimneyHeight:"chimneyHeight",hoodWidth:"hoodWidth",hoodDepth:"hoodDepth",rearHeight:"rearHeight",frontHeight:"frontHeight",notchWidth:"notch",notchHeight:"notch",};const DEFAULTS={styleId:"cloud",hoodWidth:800,hoodDepth:450,rearHeight:380,frontHeight:240,chimneyWidth:320,chimneyDepth:280,chimneyHeight:500,shimHeight:0,surfaceType:"concave",surfaceStart:"middle",notchEnabled:true,notchShape:"arch",notchWidth:420,notchHeight:80,notchOffset:0,trimStyles:{top:"corner",start:"single",hoodTop:"single",hoodBottom:"single"},};const CURVES=[{id:"concave",label:"向内弯曲"},{id:"convex",label:"向外弯曲"},{id:"flat",label:"不弯曲"},{id:"none",label:"无侧面"},];function allowedStarts(type){if(type==="none"){return[{id:"middle",label:"中间"}];}
+if(type==="convex"){return[{id:"lower",label:"中间偏下"},{id:"lowest",label:"中间更偏下"}];}
+if(type==="flat"){return[{id:"middle",label:"中间"},{id:"top",label:"顶部"}];}
+return[{id:"middle",label:"中间"},{id:"top",label:"上面"}];}
+function startLabelFor(type=state.surfaceType,value=state.surfaceStart){if(value==="lowest")return"中间更偏下";if(value==="lower")return"中间偏下";if(value==="top")return type==="flat"?"顶部":"上面";return"中间";}
+const STORAGE={customer:"yyj_customer",orders:"yyj_orders",pending:"yyj_pending_orders",lastOrder:"yyj_last_order",pendingOrder:"yyj_pending_order",};const $=(selector,root=document)=>root.querySelector(selector);const $$=(selector,root=document)=>Array.from(root.querySelectorAll(selector));const clamp=(value,min,max)=>Math.min(max,Math.max(min,Number(value)||0));const fmt=(value)=>`¥${Number(value).toLocaleString("zh-CN")}`;const esc=(value)=>String(value??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));function readStored(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
+function writeStored(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
+function removeStored(key){try{localStorage.removeItem(key);}catch{}}
+let artSeq=0;function shade(hex,percent){const value=parseInt(hex.slice(1),16);const r=(value>>16)&255;const g=(value>>8)&255;const b=value&255;const target=percent<0?0:255;const p=Math.abs(percent)/100;const to=(channel)=>Math.round((target-channel)*p+channel).toString(16).padStart(2,"0");return`#${to(r)}${to(g)}${to(b)}`;}
+const CURVE_CONTROLS={concave:{l1:[132,140],l2:[86,150],r1:[234,150],r2:[188,140]},convex:{l1:[116,124],l2:[52,136],r1:[268,136],r2:[204,124]},};function hoodArt(style,{transparent=false}={}){const uid=`hood${++artSeq}`;const color=style.color;const bg=style.bg;const light=shade(color,14);const dark=shade(color,-10);const edge=shade(color,-25);const gold="#d8be9e";const controls=CURVE_CONTROLS[style.curve];let frontTransition;let sideTransition;if(style.curve==="flat"){frontTransition="M132 112 L52 150 H268 L188 112 Z";sideTransition="M188 112 L268 150 L288 142 L204 103 Z";}else{const{l1,l2,r1,r2}=controls;frontTransition=`M132 112 C${l1[0]} ${l1[1]} ${l2[0]} ${l2[1]} 52 150 H268 C${r1[0]} ${r1[1]} ${r2[0]} ${r2[1]} 188 112 Z`;sideTransition=`M188 112 C${r2[0]} ${r2[1]} ${r1[0]} ${r1[1]} 268 150 L288 142 C${r1[0] - 18} ${r1[1] - 8} ${r2[0] + 8} ${r2[1] - 8} 204 103 Z`;}
+const edges=["M132 38 H188 L204 31","M132 112 H188","M52 150 H268 L288 142","M52 196 H268 L288 188",];let trims="";if(style.trim==="single"||style.trim==="corner"){const width=style.trim==="corner"?6:4;trims=edges.map((d)=>`<path d="${d}" fill="none" stroke="${gold}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`).join("");if(style.trim==="corner"){trims+=edges.map((d)=>`<path d="${d}" fill="none" stroke="#c9b08d" stroke-width="1.3" opacity=".3"/>`).join("");}}else if(style.trim==="double"){trims=edges.map((d)=>`<path d="${d}" fill="none" stroke="${gold}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`).join("");trims+=edges.map((d)=>`<path d="${d}" transform="translate(0 5)" fill="none" stroke="${gold}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`).join("");}
+return`<svg viewBox="0 0 320 240" role="img" aria-label="${esc(style.name)}${esc(style.tone)}烟机罩示意">
     <defs>
       <linearGradient id="${uid}bg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="${shade(bg, 10)}"/><stop offset="1" stop-color="${bg}"/>
@@ -291,9 +28,7 @@ function hoodArt(style, { transparent = false } = {}) {
         <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#7a6248" flood-opacity=".14"/>
       </filter>
     </defs>
-    ${transparent ? "" : `<rect width="320" height="240" fill="url(#${uid}bg)"/>
-    <path d="M0 201h320" stroke="${edge}" stroke-width="1" opacity=".18"/>
-    <path d="M0 58h320" stroke="#fff" stroke-width="1" opacity=".35"/>`}
+    ${transparent ? "" : `<rect width="320"height="240"fill="url(#${uid}bg)"/><path d="M0 201h320"stroke="${edge}"stroke-width="1"opacity=".18"/><path d="M0 58h320"stroke="#fff"stroke-width="1"opacity=".35"/>`}
     <ellipse cx="164" cy="211" rx="104" ry="11" fill="#7a5f3e" opacity=".1"/>
     <g filter="url(#${uid}sh)">
       <path d="M52 150 72 142h216l-20 8Z" fill="${dark}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>
@@ -309,1041 +44,113 @@ function hoodArt(style, { transparent = false } = {}) {
       <path d="M140 46h40" stroke="#fff" stroke-width="1" opacity=".28"/>
     </g>
     ${trims}
-  </svg>`;
-}
-
-function trimArtMarkup(id) {
-  if (id === "none") {
-    return `
+  </svg>`;}
+function trimArtMarkup(id){if(id==="none"){return`
       <rect x="6" y="29" width="52" height="11" rx="2" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
       <path d="M12 29H52" stroke="#b9b3a8" stroke-width="1.4" stroke-dasharray="3 3"/>
       <path d="M12 35H52" stroke="#e1d8c8" stroke-width="1" opacity=".75"/>
-    `;
-  }
-  if (id === "corner") {
-    return `
+    `;}
+if(id==="corner"){return`
       <path d="M18 15H52V19.5C40 21 24 28 18 39Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
       <path d="M21 17H48" stroke="#ffffff" stroke-width="1" opacity=".55"/>
       <path d="M48 19.5V23.5" stroke="#b89d7a" stroke-width=".8" opacity=".55"/>
-    `;
-  }
-  return `
+    `;}
+return`
     <path d="M20 30A12 12 0 0 1 44 30Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
     <path d="M23 27A9 9 0 0 1 33 20" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity=".55"/>
     <path d="M18 30H46" stroke="#b89d7a" stroke-width=".9" opacity=".7"/>
-  `;
-}
-
-function trimArt(id) {
-  const style = id === "none" ? "none" : id === "corner" ? "corner" : "single";
-  return `<svg viewBox="0 0 64 48" aria-hidden="true">${trimArtMarkup(style)}</svg>`;
-}
-
-function notchArt(shape) {
-  const outlines = {
-    rect: "M2 3H118V33H80V20H40V33H2Z",
-    rounded: "M2 3H118V33H80V24Q80 20 75 20H45Q40 20 40 24V33H2Z",
-    arch: "M2 3H118V33H80A22 22 0 0 0 40 33H2Z",
-    trapezoid: "M2 3H118V33H82L74 20H46L38 33H2Z",
-  };
-  return `<svg viewBox="0 0 120 36" aria-hidden="true">
+  `;}
+function trimArt(id){const style=id==="none"?"none":id==="corner"?"corner":"single";return`<svg viewBox="0 0 64 48" aria-hidden="true">${trimArtMarkup(style)}</svg>`;}
+function notchArt(shape){const outlines={rect:"M2 3H118V33H80V20H40V33H2Z",rounded:"M2 3H118V33H80V24Q80 20 75 20H45Q40 20 40 24V33H2Z",arch:"M2 3H118V33H80A22 22 0 0 0 40 33H2Z",trapezoid:"M2 3H118V33H82L74 20H46L38 33H2Z",};return`<svg viewBox="0 0 120 36" aria-hidden="true">
     <path d="${outlines[shape] || outlines.rect}" fill="rgba(36, 92, 69, 0.1)" stroke="#245c45" stroke-width="1.3" stroke-linejoin="round"/>
     <path d="M2 3H118" stroke="#245c45" stroke-width="1" opacity=".35"/>
     <path d="M2 33h32M86 33h32" stroke="#245c45" stroke-width="1" stroke-linecap="round" opacity=".35"/>
-  </svg>`;
-}
-
-function curveArt(type) {
-  if (type === "none") {
-    return `<svg viewBox="0 0 72 48" aria-hidden="true">
+  </svg>`;}
+function curveArt(type){if(type==="none"){return`<svg viewBox="0 0 72 48" aria-hidden="true">
       <path d="M24 4 L8 44 H64 L48 4 Z" fill="none" stroke="#245c45" stroke-width="1.2" stroke-dasharray="4 3" opacity=".45"/>
       <path d="M36 4v40" stroke="#245c45" stroke-width=".8" stroke-dasharray="2 3" opacity=".22"/>
-    </svg>`;
-  }
-  const paths = {
-    flat: "M24 4 L8 44 H64 L48 4 Z",
-    concave: "M24 4 C24 24 8 28 8 44 H64 C64 28 48 24 48 4 Z",
-    convex: "M24 4 C14 12 8 26 8 44 H64 C64 26 58 12 48 4 Z",
-  };
-  return `<svg viewBox="0 0 72 48" aria-hidden="true">
+    </svg>`;}
+const paths={flat:"M24 4 L8 44 H64 L48 4 Z",concave:"M24 4 C24 24 8 28 8 44 H64 C64 28 48 24 48 4 Z",convex:"M24 4 C14 12 8 26 8 44 H64 C64 26 58 12 48 4 Z",};return`<svg viewBox="0 0 72 48" aria-hidden="true">
     <path d="${paths[type]}" fill="rgba(36,92,69,.1)" stroke="#245c45" stroke-width="1.35" stroke-linejoin="round"/>
     <path d="M36 4v40" stroke="#245c45" stroke-width=".8" stroke-dasharray="2 3" opacity=".28"/>
-  </svg>`;
-}
-
-/* ---------- 状态 ---------- */
-let state = { ...DEFAULTS, trimStyles: { ...DEFAULTS.trimStyles } };
-let activeTab = "upper";
-let activeCaseIndex = 0;
-let activeInstallKey = "base";
-let previewApi = null;
-let previewFailed = false;
-let previewTimer = 0;
-let previewPromise = null;
-let heroTransition = null;
-let lastRenderedRoute = null;
-const HERO_GROW_MS = 820;
-let toastTimer = 0;
-let pendingOrder = null;
-let lastOrder = null;
-let installApi = null;
-let installLoading = false;
-let installSig = "";
-let sheetOpen = false;
-let sheetPageScroll = 0;
-let lastFocused = null;
-let sheetCleanup = null;
-let miniInstallApi = null;
-let miniInstallToken = 0;
-
-function sanitizeState(input) {
-  const next = { ...DEFAULTS, trimStyles: { ...DEFAULTS.trimStyles } };
-  for (const key of Object.keys(DEFAULTS)) {
-    if (key === "trimStyles") continue;
-    const fallback = DEFAULTS[key];
-    const value = input?.[key];
-    if (typeof fallback === "number") {
-      const number = Number(value);
-      if (Number.isFinite(number)) next[key] = number;
-    } else if (typeof value === "string") {
-      next[key] = value;
-    }
-  }
-  if (!STYLES.some((style) => style.id === next.styleId)) next.styleId = DEFAULTS.styleId;
-  if (!CURVES.some((curve) => curve.id === next.surfaceType)) next.surfaceType = DEFAULTS.surfaceType;
-  if (!["middle", "top", "lower", "lowest"].includes(next.surfaceStart)) next.surfaceStart = DEFAULTS.surfaceStart;
-  const legacy = input?.trimStyle;
-  for (const position of TRIM_POSITIONS) {
-    const value = input?.trimStyles?.[position.key] ?? legacy;
-    next.trimStyles[position.key] = TRIMS.some((trim) => trim.id === value)
-      ? value
-      : DEFAULTS.trimStyles[position.key];
-  }
-  return next;
-}
-
-// 中间那条装饰条只负责上竖与下方罩体之间的接缝。
-// 无侧面时没有接缝；起点在顶部时接缝就是烟道顶边，所以这条要一起去掉。
-function hasMiddleEdge(config = state) {
-  return config?.surfaceType !== "none" && config?.surfaceStart !== "top";
-}
-
-function activeTrimPositions(config = state) {
-  return hasMiddleEdge(config)
-    ? TRIM_POSITIONS
-    : TRIM_POSITIONS.filter((position) => position.key !== "start");
-}
-
-function normalizeState() {
-  state.hoodWidth = clamp(state.hoodWidth, DIMS.hoodWidth.min, DIMS.hoodWidth.max);
-  state.hoodDepth = clamp(state.hoodDepth, DIMS.hoodDepth.min, DIMS.hoodDepth.max);
-  state.rearHeight = clamp(state.rearHeight, DIMS.rearHeight.min, DIMS.rearHeight.max);
-  state.frontHeight = clamp(state.frontHeight, DIMS.frontHeight.min, DIMS.frontHeight.max);
-  state.chimneyWidth = clamp(state.chimneyWidth, DIMS.chimneyWidth.min, DIMS.chimneyWidth.max);
-  state.chimneyDepth = clamp(state.chimneyDepth, DIMS.chimneyDepth.min, DIMS.chimneyDepth.max);
-  state.chimneyHeight = clamp(state.chimneyHeight, DIMS.chimneyHeight.min, DIMS.chimneyHeight.max);
-  state.shimHeight = clamp(state.shimHeight, 0, 60);
-  state.frontHeight = Math.min(state.frontHeight, state.rearHeight);
-  state.chimneyWidth = Math.min(state.chimneyWidth, state.hoodWidth - 40);
-  state.chimneyDepth = Math.min(state.chimneyDepth, state.hoodDepth - 30);
-  state.notchWidth = clamp(state.notchWidth ?? 420, DIMS.notchWidth.min, Math.min(DIMS.notchWidth.max, state.hoodWidth + 20 - 60));
-  state.notchHeight = clamp(state.notchHeight ?? 80, DIMS.notchHeight.min, Math.min(DIMS.notchHeight.max, state.frontHeight - 24));
-  state.notchOffset = clamp(state.notchOffset ?? 0, -200, 200);
-  if (!NOTCH_SHAPES.some((item) => item.id === state.notchShape)) state.notchShape = "arch";
-  state.notchEnabled = state.notchEnabled !== false;
-  const allowed = allowedStarts(state.surfaceType).map((item) => item.id);
-  if (!allowed.includes(state.surfaceStart)) state.surfaceStart = allowed[0];
-}
-
-const currentStyle = () => STYLES.find((style) => style.id === state.styleId) || STYLES[0];
-const trimFor = (key) => TRIMS.find((trim) => trim.id === (state.trimStyles?.[key] || "none")) || TRIMS[0];
-function priceInfoFor(config = state) {
-  const details = activeTrimPositions(config).map((position) => {
-    const styleId = config.trimStyles?.[position.key] || "none";
-    const trim = TRIMS.find((item) => item.id === styleId) || TRIMS[0];
-    return { ...position, styleId: trim.id, styleName: trim.name, price: trim.price };
-  });
-  const trim = details.reduce((sum, item) => sum + item.price, 0);
-  return { base: CONFIG.basePrice, trim, total: CONFIG.basePrice + trim, details };
-}
-function priceInfo() {
-  return priceInfoFor(state);
-}
-// 下单页展示的划线价：总价的 140%。
-const listPrice = (total) => Math.round(Number(total) * 1.4);
-function trimSummaryShort(config = state) {
-  const styles = config.trimStyles || {};
-  return activeTrimPositions(config).map((position) => {
-    const trim = TRIMS.find((item) => item.id === styles[position.key]) || TRIMS[0];
-    return trim.name;
-  }).join(" / ");
-}
-
-function applyPreset(style) {
-  state.styleId = style.id;
-  state.surfaceType = style.curve;
-  state.surfaceStart = style.start;
-  if (style.dims) Object.assign(state, style.dims);
-  state.trimStyles = { ...(style.trims || {
-    top: style.trim, start: style.trim, hoodTop: style.trim, hoodBottom: style.trim,
-  }) };
-  if (style.notch) {
-    state.notchEnabled = style.notch.enabled !== false;
-    if (style.notch.shape) state.notchShape = style.notch.shape;
-    if (Number.isFinite(Number(style.notch.width))) state.notchWidth = Number(style.notch.width);
-    if (Number.isFinite(Number(style.notch.height))) state.notchHeight = Number(style.notch.height);
-    if (Number.isFinite(Number(style.notch.offset))) state.notchOffset = Number(style.notch.offset);
-  }
-  normalizeState();
-  syncUI();
-  setCustomizeTab("upper");
-}
-
-/* ---------- 首页案例 ---------- */
-function heroMotionAllowed() {
-  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    && typeof Element.prototype.animate === "function";
-}
-
-function resetHeroPreview() {
-  const preview = $("#preview3d");
-  if (!preview) return;
-  preview.style.transform = "";
-  preview.style.transformOrigin = "";
-}
-
-function finishHeroTransition() {
-  const active = heroTransition;
-  if (!active) return;
-  heroTransition = null;
-  clearTimeout(active.timer);
-  if (active.animation) {
-    active.animation.onfinish = null;
-    try { active.animation.cancel(); } catch { /* 忽略 */ }
-  }
-  resetHeroPreview();
-  if (active.mode === "reverse") {
-    // 反向动画结束时，首页已经在下面铺好，直接同一帧换回首页。
-    suppressCaseScroll = false;
-    active.homeView?.classList.remove("is-hero-reverse-home");
-    active.homeView?.classList.add("no-view-in");
-    active.view?.classList.remove("is-hero-reverse", "is-hero-measuring", "is-hero-entering", "is-hero-active");
-    applyRoute("home");
-    normalizeCaseScroll();
-    return;
-  }
-  if (active.view) {
-    // 动画结束后保持“无 viewIn”，否则移除过渡类会重新触发整页淡入。
-    active.view.classList.add("no-view-in");
-    active.view.classList.remove("is-hero-measuring", "is-hero-entering", "is-hero-active");
-  }
-}
-
-function abortHeroTransition() {
-  const active = heroTransition;
-  if (!active) return;
-  heroTransition = null;
-  clearTimeout(active.timer);
-  if (active.animation) {
-    active.animation.onfinish = null;
-    try { active.animation.cancel(); } catch { /* 忽略 */ }
-  }
-  resetHeroPreview();
-  if (active.mode === "reverse") {
-    suppressCaseScroll = false;
-    active.homeView?.classList.remove("is-hero-reverse-home");
-    active.view?.classList.remove("is-hero-reverse", "is-hero-measuring", "is-hero-entering", "is-hero-active");
-  } else if (active.view) {
-    active.view.classList.remove("is-hero-measuring", "is-hero-entering", "is-hero-active");
-  }
-  previewApi?.stopIntroSpin?.();
-}
-
-// 首页 3D 小图 → 定制页：先把定制页按最终布局藏在屏幕外测量好，
-// 再用 transform 把定制页模型缩到小图模型的位置，随后一边旋转一边放大到位。
-function startHeroTransition(sourceRect) {
-  const view = $(".view--customize");
-  const previewEl = $("#preview3d");
-  if (!view || !previewEl || !sourceRect || !heroMotionAllowed()) return false;
-  if (previewFailed || Math.abs(window.scrollY) > 4) return false;
-  if (sourceRect.width < 8 || sourceRect.height < 8) return false;
-  if (sourceRect.bottom < 0 || sourceRect.top > window.innerHeight) return false;
-
-  const token = {};
-  heroTransition = { token, mode: "forward", view, animation: null, timer: 0 };
-  view.classList.add("is-hero-measuring");
-
-  (async () => {
-    try {
-      const api = await ensurePreview();
-      if (!heroTransition || heroTransition.token !== token) return;
-      if (!api || typeof api.modelScreenRect !== "function") {
-        abortHeroTransition();
-        go("customize");
-        return;
-      }
-
-      api.resizeNow?.();
-      api.cameraOverview?.(0);
-      const dest = api.modelScreenRect();
-      if (!dest || dest.width < 8 || dest.height < 8) {
-        abortHeroTransition();
-        go("customize");
-        return;
-      }
-
-      const scale = clamp(sourceRect.height / dest.height, 0.02, 1);
-      const dx = sourceRect.centerX - dest.centerX;
-      const dy = sourceRect.centerY - dest.centerY;
-      const startTransform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-      const previewRect = previewEl.getBoundingClientRect();
-      const originX = dest.centerX - previewRect.left;
-      const originY = dest.centerY - previewRect.top;
-
-      // 先切路由，再在同一帧里把模型摆到小图位置，避免看到模型跳变。
-      view.classList.add("is-hero-entering");
-      goNow("customize");
-      if (!heroTransition || heroTransition.token !== token) return;
-
-      previewEl.style.transformOrigin = `${originX}px ${originY}px`;
-      previewEl.style.transform = startTransform;
-      view.classList.remove("is-hero-measuring");
-      view.classList.add("is-hero-active");
-
-      api.introSpin?.(HERO_GROW_MS + 100);
-      const animation = previewEl.animate(
-        [
-          { transform: startTransform, offset: 0 },
-          { transform: "translate(0px, 0px) scale(1)", offset: 1 },
-        ],
-        {
-          duration: HERO_GROW_MS,
-          easing: "cubic-bezier(0.2, 0.72, 0.18, 1)",
-          fill: "both",
-        }
-      );
-      heroTransition.animation = animation;
-      const finish = () => finishHeroTransition();
-      animation.onfinish = finish;
-      heroTransition.timer = window.setTimeout(finish, HERO_GROW_MS + 160);
-    } catch (error) {
-      console.warn("首页 3D 模型衔接失败，改为普通切换", error);
-      if (heroTransition && heroTransition.token === token) {
-        const route = currentRoute();
-        abortHeroTransition();
-        if (route !== "customize") go("customize");
-      }
-    }
-  })();
-
-  return true;
-}
-
-// 定制页 → 首页：主模型绕自身转一圈，同时缩回右下角 3D 小图的位置。
-// 首页先按最终布局藏在屏幕外量好小图模型，动画结束的同一帧再换回首页。
-function startReverseHero() {
-  const previewEl = $("#preview3d");
-  const view = $(".view--customize");
-  const homeView = $('.view[data-view="home"]');
-  if (!previewApi || !previewEl || !view || !homeView) return false;
-  if (!caseThumbApi || typeof caseThumbApi.modelScreenRect !== "function") return false;
-  if (previewFailed || !heroMotionAllowed() || Math.abs(window.scrollY) > 4) return false;
-  if (sheetOpen || view.classList.contains("is-hero-active")) return false;
-
-  const startRect = previewApi.modelScreenRect?.();
-  if (!startRect || startRect.width < 8 || startRect.height < 8) return false;
-
-  const token = {};
-  suppressCaseScroll = true;
-  try {
-    // 首页按最终布局在定制页下面铺好：小图就在落点处，主模型缩回去时直接叠到它上面。
-    homeView.classList.add("is-hero-reverse-home");
-    ensureCaseTrackPosition();
-    const track = $("#caseTrack");
-    if (track && track.clientWidth) {
-      const targetLeft = virtualCaseForReal(activeCaseIndex) * track.clientWidth;
-      if (Math.abs(track.scrollLeft - targetLeft) > 1) track.scrollLeft = targetLeft;
-    }
-    caseThumbApi.resizeNow?.();
-    const dest = caseThumbApi.modelScreenRect?.();
-    const endDirection = caseThumbApi.getViewDirection?.() || null;
-    if (!dest || dest.width < 8 || dest.height < 8) {
-      homeView.classList.remove("is-hero-reverse-home");
-      suppressCaseScroll = false;
-      return false;
-    }
-    // 结束观察方向用小图的相机方向，这样落地时和小图的姿态完全一致。
-    const endRect = (endDirection && previewApi.modelScreenRect?.(endDirection)) || startRect;
-
-    const previewRect = previewEl.getBoundingClientRect();
-    const originX = startRect.centerX - previewRect.left;
-    const originY = startRect.centerY - previewRect.top;
-    const scale = clamp(dest.height / endRect.height, 0.02, 1);
-    // 以起始模型中心为缩放原点，把「结束姿态下的模型中心」精确映射到小图模型中心。
-    const dx = dest.centerX - startRect.centerX - (endRect.centerX - startRect.centerX) * scale;
-    const dy = dest.centerY - startRect.centerY - (endRect.centerY - startRect.centerY) * scale;
-    const endTransform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-
-    heroTransition = { token, mode: "reverse", view, homeView, animation: null, timer: 0 };
-    previewEl.style.transformOrigin = `${originX}px ${originY}px`;
-    // 定制页背景、顶栏和底部面板一起淡出，让下面的首页透出来；画布保持在最上层。
-    view.classList.add("is-hero-active", "is-hero-reverse");
-
-    previewApi.introSpin?.(HERO_GROW_MS, { endDirection });
-    const animation = previewEl.animate(
-      [
-        { transform: "translate(0px, 0px) scale(1)", offset: 0 },
-        { transform: endTransform, offset: 1 },
-      ],
-      {
-        duration: HERO_GROW_MS,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-        fill: "both",
-      }
-    );
-    heroTransition.animation = animation;
-    const finish = () => finishHeroTransition();
-    animation.onfinish = finish;
-    heroTransition.timer = window.setTimeout(finish, HERO_GROW_MS + 160);
-    return true;
-  } catch (error) {
-    console.warn("定制页 3D 模型退回失败，改为普通切换", error);
-    suppressCaseScroll = false;
-    if (heroTransition && heroTransition.token === token) abortHeroTransition();
-    homeView.classList.remove("is-hero-reverse-home");
-    return false;
-  }
-}
-
-/* 首尾克隆实现无限循环：虚拟顺序为 [末张克隆][真实 1..n][首张克隆]，
- * 滑到克隆页后立刻无动画跳回对应的真实页，观感上可以一直往同一个方向滑。 */
-function virtualCasePosition() {
-  const track = $("#caseTrack");
-  if (!track) return 0;
-  return track.scrollLeft / Math.max(1, track.clientWidth);
-}
-
-function realCaseIndex(virtualIndex) {
-  const count = HOME_CASES.length;
-  if (count < 2) return 0;
-  if (virtualIndex <= 0) return count - 1;
-  if (virtualIndex >= count + 1) return 0;
-  return clamp(virtualIndex - 1, 0, count - 1);
-}
-
-function nearestVirtualCase() {
-  const count = HOME_CASES.length;
-  if (count < 2) return 0;
-  return clamp(Math.round(virtualCasePosition()), 0, count + 1);
-}
-
-function currentCaseIndex() {
-  return realCaseIndex(nearestVirtualCase());
-}
-
-function virtualCaseForReal(realIndex) {
-  const count = HOME_CASES.length;
-  const target = clamp(realIndex, 0, count - 1);
-  if (count < 2) return 0;
-  const position = virtualCasePosition();
-  // 首尾的真实页各有两个等价位置，选离当前位置最近的那个，避免整排滚回去。
-  const candidates = [target + 1];
-  if (target === 0) candidates.push(count + 1);
-  if (target === count - 1) candidates.push(0);
-  return candidates.reduce(
-    (best, value) => (Math.abs(value - position) < Math.abs(best - position) ? value : best),
-    candidates[0]
-  );
-}
-
-function startWithActiveCase() {
-  if (heroTransition) return;
-  stopCaseAuto();
-  clearTimeout(caseSwipeTimer);
-  const index = currentCaseIndex();
-  updateCaseProgress(index);
-  const item = HOME_CASES[index] || HOME_CASES[0];
-  const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
-  // 从小图出发的模型状态必须和首页缩略图完全一致，所以垫高归零。
-  const sourceRect = caseThumbApi?.modelScreenRect?.() || null;
-  state.shimHeight = 0;
-  applyPreset(style);
-  clearTimeout(previewTimer);
-  previewTimer = 0;
-  if (previewApi) previewApi.update({ ...state });
-  if (startHeroTransition(sourceRect)) return;
-  go("customize");
-}
-
-const CASE_FLIP_MS = 480;
-const CASE_FLIP_DEBOUNCE = 120;
-const CASE_SCROLL_LOCK_MS = 900;
-
-const caseModel = {
-  front: null,
-  back: null,
-  flipper: null,
-  button: null,
-  current: "",
-  currentIndex: 0,
-  requested: "",
-  requestedIndex: 0,
-  flipTarget: "",
-  flipIndex: 0,
-  timer: 0,
-  animation: null,
-  token: 0,
-  loaded: new Set(),
-};
-let caseScrollTarget = null;
-let caseScrollTimer = 0;
-let caseSwipeTimer = 0;
-let suppressCaseScroll = false;
-let caseInteracting = false;
-let caseThumbApi = null;
-let caseThumbLoading = false;
-let caseThumbFailed = false;
-let caseThumbIndex = 0;
-let caseThumbScheduled = false;
-
-function casePreviewState(index) {
-  const item = HOME_CASES[clamp(index, 0, HOME_CASES.length - 1)] || HOME_CASES[0];
-  const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
-  const notch = style.notch || {};
-  return {
-    styleId: style.id,
-    ...style.dims,
-    shimHeight: 0,
-    surfaceType: style.curve,
-    surfaceStart: style.start,
-    notchEnabled: notch.enabled !== false,
-    notchShape: notch.shape || "arch",
-    notchWidth: Number.isFinite(Number(notch.width)) ? Number(notch.width) : 420,
-    notchHeight: Number.isFinite(Number(notch.height)) ? Number(notch.height) : 80,
-    notchOffset: Number.isFinite(Number(notch.offset)) ? Number(notch.offset) : 0,
-    trimStyles: { ...(style.trims || {}) },
-  };
-}
-
-async function ensureCaseThumb() {
-  if (caseThumbApi || caseThumbLoading || caseThumbFailed) return;
-  if (currentRoute() !== "home") return;
-  const container = $("#case3dCanvas");
-  if (!container) return;
-  caseThumbLoading = true;
-  const initialIndex = activeCaseIndex;
-  try {
-    const module = await import(PREVIEW_MODULE_URL);
-    if (caseThumbApi || caseThumbFailed || currentRoute() !== "home") return;
-    const api = module.createPreview(container, casePreviewState(initialIndex), {
-      thumbnail: true,
-      aspectFit: true,
-      fitMargin: 1.9,
-      direction: [0.42, 0.14, 1.5],
-      pixelRatio: 1.5,
-      edges: false,
-    });
-    caseThumbApi = api;
-    caseThumbIndex = initialIndex;
-    if (activeCaseIndex !== initialIndex) {
-      api.update(casePreviewState(activeCaseIndex));
-      caseThumbIndex = activeCaseIndex;
-    }
-    const canvas = container.querySelector("canvas");
-    canvas?.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-      caseThumbFailed = true;
-      caseThumbApi?.dispose();
-      caseThumbApi = null;
-      caseThumbIndex = activeCaseIndex;
-      caseModel.current = caseModelSrc(activeCaseIndex);
-      caseModel.currentIndex = activeCaseIndex;
-      if (caseModel.front) caseModel.front.src = caseModel.current;
-      caseModel.button?.classList.remove("is-live");
-    }, { once: true });
-    clearTimeout(caseModel.timer);
-    caseModel.timer = 0;
-    if (caseModel.animation) {
-      caseModel.animation.cancel();
-      caseModel.animation = null;
-    }
-    caseModel.current = caseModelSrc(caseThumbIndex);
-    caseModel.currentIndex = caseThumbIndex;
-    caseModel.requested = caseModel.current;
-    caseModel.requestedIndex = caseThumbIndex;
-    caseModel.button?.classList.remove("is-flipping");
-    caseModel.button?.classList.add("is-live");
-  } catch (error) {
-    caseThumbFailed = true;
-    console.warn("首页 3D 模型初始化失败，保留图片兜底", error);
-  } finally {
-    caseThumbLoading = false;
-  }
-}
-
-function scheduleCaseThumb() {
-  if (caseThumbApi || caseThumbLoading || caseThumbFailed || caseThumbScheduled) return;
-  caseThumbScheduled = true;
-  const run = () => {
-    caseThumbScheduled = false;
-    ensureCaseThumb();
-  };
-  if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(run, { timeout: 600 });
-  } else {
-    window.setTimeout(run, 400);
-  }
-}
-
-function caseModelSrc(index) {
-  const item = HOME_CASES[clamp(index, 0, HOME_CASES.length - 1)];
-  return item ? (item.model || HOME_3D_IMAGE || item.image) : "";
-}
-
-function cacheCaseModelNodes() {
-  caseModel.button = $("#case3d");
-  caseModel.flipper = $(".case-3d-flipper");
-  caseModel.front = $(".case-3d-front");
-  caseModel.back = $(".case-3d-back");
-}
-
-function preloadCaseModels() {
-  HOME_CASES.forEach((item) => {
-    const src = item.model || HOME_3D_IMAGE || item.image;
-    if (!src || caseModel.loaded.has(src)) return;
-    const image = new Image();
-    image.onload = () => caseModel.loaded.add(src);
-    image.onerror = () => caseModel.loaded.add(src);
-    image.src = src;
-  });
-}
-
-function clearCaseScrollTarget() {
-  caseScrollTarget = null;
-  clearTimeout(caseScrollTimer);
-  caseScrollTimer = 0;
-}
-
-function resetCaseFlipper() {
-  if (!caseModel.flipper) return;
-  caseModel.flipper.style.transition = "none";
-  caseModel.flipper.style.transform = "rotateY(0deg)";
-}
-
-function setCaseModel(index, { immediate = false } = {}) {
-  const normalized = clamp(index, 0, HOME_CASES.length - 1);
-  const src = caseModelSrc(normalized);
-  if (!src) return;
-
-  if (caseThumbApi) {
-    if (normalized === caseThumbIndex) return;
-    const direction = normalized >= caseThumbIndex ? 1 : -1;
-    caseThumbIndex = normalized;
-    caseModel.current = src;
-    caseModel.currentIndex = normalized;
-    caseModel.requested = src;
-    caseModel.requestedIndex = normalized;
-    clearTimeout(caseModel.timer);
-    caseModel.timer = 0;
-    if (caseModel.animation) {
-      caseModel.animation.cancel();
-      caseModel.animation = null;
-    }
-    caseModel.button?.classList.remove("is-flipping");
-    caseModel.button?.setAttribute("aria-label", `查看${HOME_CASES[normalized].name}的 3D 模型`);
-    caseThumbApi.spinToState(casePreviewState(normalized), { direction, duration: 900 });
-    return;
-  }
-
-  if (src === caseModel.current && !caseModel.animation && !caseModel.timer) return;
-  if (src === caseModel.requested && (caseModel.animation || caseModel.timer)) return;
-
-  caseModel.requested = src;
-  caseModel.requestedIndex = normalized;
-  caseModel.button?.setAttribute("aria-label", `查看${HOME_CASES[normalized].name}的 3D 模型`);
-  clearTimeout(caseModel.timer);
-  caseModel.timer = 0;
-
-  if (immediate) {
-    startCaseFlip();
-  } else {
-    caseModel.timer = window.setTimeout(() => {
-      caseModel.timer = 0;
-      startCaseFlip();
-    }, CASE_FLIP_DEBOUNCE);
-  }
-}
-
-function startCaseFlip() {
-  const { button, flipper, front, back } = caseModel;
-  const src = caseModel.requested;
-  const index = caseModel.requestedIndex;
-  if (!button || !flipper || !front || !back || !src) return;
-
-  // 新的切换到来时，先把上一段旋转落到它自己的目标，再开始下一段。
-  if (caseModel.animation) {
-    caseModel.animation.cancel();
-    caseModel.animation = null;
-    if (caseModel.flipTarget && caseModel.flipTarget !== caseModel.current) {
-      caseModel.current = caseModel.flipTarget;
-      caseModel.currentIndex = caseModel.flipIndex;
-      front.src = caseModel.current;
-    }
-    resetCaseFlipper();
-  }
-
-  if (src === caseModel.current) {
-    caseModel.requested = src;
-    caseModel.requestedIndex = index;
-    resetCaseFlipper();
-    button.classList.remove("is-flipping");
-    return;
-  }
-
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduceMotion) {
-    front.src = src;
-    caseModel.current = src;
-    caseModel.currentIndex = index;
-    caseModel.flipTarget = src;
-    caseModel.flipIndex = index;
-    resetCaseFlipper();
-    button.classList.remove("is-flipping");
-    return;
-  }
-
-  const direction = index >= caseModel.currentIndex ? 1 : -1;
-  const token = ++caseModel.token;
-  caseModel.flipTarget = src;
-  caseModel.flipIndex = index;
-  back.src = src;
-  resetCaseFlipper();
-  button.classList.add("is-flipping");
-
-  const play = () => {
-    if (token !== caseModel.token) return;
-    if (typeof flipper.animate !== "function") {
-      front.src = src;
-      caseModel.current = src;
-      caseModel.currentIndex = index;
-      resetCaseFlipper();
-      button.classList.remove("is-flipping");
-      return;
-    }
-    // 强制一次布局，确保 flipper 从 0° 开始而不是继承上一段内联值。
-    void flipper.offsetWidth;
-    const animation = flipper.animate([
-      { transform: "rotateY(0deg) scale(1)", offset: 0 },
-      { transform: `rotateY(${direction * 90}deg) scale(0.94)`, offset: 0.5 },
-      { transform: `rotateY(${direction * 180}deg) scale(1)`, offset: 1 },
-    ], {
-      duration: CASE_FLIP_MS,
-      easing: "cubic-bezier(0.3, 0, 0.2, 1)",
-      fill: "forwards",
-    });
-    caseModel.animation = animation;
-    let finished = false;
-    let fallback = 0;
-    const finish = () => {
-      if (finished || token !== caseModel.token) return;
-      finished = true;
-      clearTimeout(fallback);
-      front.src = src;
-      caseModel.current = src;
-      caseModel.currentIndex = index;
-      animation.cancel();
-      caseModel.animation = null;
-      resetCaseFlipper();
-      button.classList.remove("is-flipping");
-    };
-    animation.onfinish = finish;
-    // 后台标签页或动画被节流时，也保证缩略图最终落到新模型。
-    fallback = window.setTimeout(finish, CASE_FLIP_MS + 80);
-  };
-
-  if (back.complete && back.naturalWidth) {
-    play();
-  } else {
-    const onReady = () => {
-      back.onload = null;
-      back.onerror = null;
-      play();
-    };
-    back.onload = onReady;
-    back.onerror = onReady;
-  }
-}
-
-function updateCaseProgress(index) {
-  activeCaseIndex = clamp(index, 0, HOME_CASES.length - 1);
-  $$("#caseProgress button").forEach((button, buttonIndex) => {
-    button.classList.toggle("is-active", buttonIndex === activeCaseIndex);
-    const fill = button.querySelector(".case-fill");
-    if (fill) fill.style.transform = "scaleX(0)";
-  });
-}
-
-function snapToCase(index) {
-  const track = $("#caseTrack");
-  if (!track) return;
-  const target = clamp(index, 0, HOME_CASES.length - 1);
-  const virtual = virtualCaseForReal(target);
-  caseScrollTarget = target;
-  clearTimeout(caseScrollTimer);
-  caseScrollTimer = window.setTimeout(() => {
-    caseScrollTarget = null;
-    caseScrollTimer = 0;
-  }, CASE_SCROLL_LOCK_MS);
-  updateCaseProgress(target);
-  setCaseModel(target, { immediate: true });
-  track.scrollTo({ left: virtual * track.clientWidth, behavior: "smooth" });
-  scheduleCaseNormalize();
-}
-
-function snapToNearestCase() {
-  snapToCase(realCaseIndex(nearestVirtualCase()));
-}
-
-let caseSettleTimer = 0;
-function normalizeCaseScroll() {
-  const track = $("#caseTrack");
-  const count = HOME_CASES.length;
-  if (!track || count < 2 || caseInteracting || suppressCaseScroll) return;
-  const position = virtualCasePosition();
-  const nearest = Math.round(position);
-  // 必须真正停在克隆页上（约 1px 内）才跳回真实页；滑动途中跳会闪一下。
-  if (Math.abs(position - nearest) > 0.002) return;
-  let target = 0;
-  if (nearest <= 0) {
-    target = count * track.clientWidth;
-  } else if (nearest >= count + 1) {
-    target = track.clientWidth;
-  } else {
-    return;
-  }
-  // 跳转时临时关掉 scroll-snap 和滚动动画，避免浏览器把这次瞬移又做成一段滚动。
-  const snap = track.style.scrollSnapType;
-  const behavior = track.style.scrollBehavior;
-  track.style.scrollSnapType = "none";
-  track.style.scrollBehavior = "auto";
-  track.scrollLeft = target;
-  void track.offsetWidth;
-  track.style.scrollSnapType = snap;
-  track.style.scrollBehavior = behavior;
-}
-
-function scheduleCaseNormalize() {
-  clearTimeout(caseSettleTimer);
-  caseSettleTimer = window.setTimeout(normalizeCaseScroll, 160);
-}
-
-function ensureCaseTrackPosition() {
-  const track = $("#caseTrack");
-  if (!track || HOME_CASES.length < 2) return;
-  const width = track.clientWidth;
-  if (!width) return;
-  // 页面隐藏时渲染过，scrollLeft 会停在 0（左侧克隆页），显示后落到真实首张。
-  if (track.scrollLeft < 1) track.scrollLeft = width;
-}
-
-/* ---------- 首页自动轮播 ---------- */
-const CASE_INTERVAL = 5000;
-let caseAutoRaf = 0;
-let caseAutoStart = 0;
-let caseAutoElapsed = 0;
-let caseAutoPaused = false;
-
-function paintCaseFill(progress) {
-  const button = $$("#caseProgress button")[activeCaseIndex];
-  const fill = button?.querySelector(".case-fill");
-  if (fill) fill.style.transform = `scaleX(${Math.min(1, Math.max(0, progress))})`;
-}
-
-function stopCaseAuto() {
-  if (caseAutoRaf) cancelAnimationFrame(caseAutoRaf);
-  caseAutoRaf = 0;
-}
-
-function restartCaseAuto() {
-  stopCaseAuto();
-  if (currentRoute() !== "home" || document.hidden) return;
-  caseAutoElapsed = 0;
-  caseAutoStart = performance.now();
-  caseAutoPaused = false;
-  paintCaseFill(0);
-  const tick = (now) => {
-    if (caseAutoPaused) {
-      caseAutoStart = now - caseAutoElapsed;
-      caseAutoRaf = requestAnimationFrame(tick);
-      return;
-    }
-    caseAutoElapsed = now - caseAutoStart;
-    const progress = Math.min(1, caseAutoElapsed / CASE_INTERVAL);
-    paintCaseFill(progress);
-    if (progress >= 1) {
-      const next = (activeCaseIndex + 1) % HOME_CASES.length;
-      snapToCase(next);
-      caseAutoElapsed = 0;
-      caseAutoStart = now;
-    }
-    caseAutoRaf = requestAnimationFrame(tick);
-  };
-  caseAutoRaf = requestAnimationFrame(tick);
-}
-
-function pauseCaseAuto() {
-  caseAutoPaused = true;
-}
-
-function bindCaseEvents() {
-  const track = $("#caseTrack");
-  if (!track) return;
-  track.addEventListener("scroll", () => {
-    if (suppressCaseScroll) return;
-    const index = realCaseIndex(Math.round(virtualCasePosition()));
-    updateCaseProgress(index);
-    if (!caseInteracting) scheduleCaseNormalize();
-    if (caseScrollTarget !== null) {
-      if (index === caseScrollTarget) clearCaseScrollTarget();
-      return;
-    }
-    setCaseModel(index);
-  }, { passive: true });
-  const syncCaseAfterSwipe = () => {
-    clearTimeout(caseSwipeTimer);
-    caseInteracting = false;
-    let attempts = 0;
-    const settle = () => {
-      const position = virtualCasePosition();
-      const nearest = nearestVirtualCase();
-      // 惯性还没停就先等一等，别把「滑到下一张」的动画打断。
-      if (Math.abs(position - nearest) > 0.002 && attempts++ < 20) {
-        caseSwipeTimer = window.setTimeout(settle, 120);
-        return;
-      }
-      normalizeCaseScroll();
-      const index = realCaseIndex(nearest);
-      updateCaseProgress(index);
-      setCaseModel(index);
-      restartCaseAuto();
-    };
-    caseSwipeTimer = window.setTimeout(settle, 260);
-  };
-  track.addEventListener("touchstart", () => {
-    clearTimeout(caseSwipeTimer);
-    caseInteracting = true;
-    clearCaseScrollTarget();
-    pauseCaseAuto();
-  }, { passive: true });
-  track.addEventListener("touchend", syncCaseAfterSwipe, { passive: true });
-  track.addEventListener("touchcancel", syncCaseAfterSwipe, { passive: true });
-
-  // 桌面端：按住鼠标左右拖动也能切换（触屏仍走原生滚动）
-  let dragging = false;
-  let moved = false;
-  let dragStartX = 0;
-  let dragStartScroll = 0;
-  track.addEventListener("pointerdown", (event) => {
-    clearTimeout(caseSwipeTimer);
-    caseInteracting = true;
-    clearCaseScrollTarget();
-    pauseCaseAuto();
-    if (event.pointerType !== "mouse" || event.button !== 0) return;
-    dragging = true;
-    moved = false;
-    dragStartX = event.clientX;
-    dragStartScroll = track.scrollLeft;
-    track.classList.add("is-dragging");
-  });
-  window.addEventListener("pointermove", (event) => {
-    if (!dragging) return;
-    const dx = event.clientX - dragStartX;
-    if (Math.abs(dx) > 5) moved = true;
-    track.scrollLeft = dragStartScroll - dx;
-  });
-  const endDrag = () => {
-    caseInteracting = false;
-    if (!dragging) return;
-    dragging = false;
-    track.classList.remove("is-dragging");
-    if (moved) snapToNearestCase();
-    restartCaseAuto();
-  };
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("pointercancel", endDrag);
-  window.addEventListener("blur", endDrag);
-
-  $("#caseProgress")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-case-index]");
-    if (!button) return;
-    snapToCase(Number(button.dataset.caseIndex));
-    restartCaseAuto();
-  });
-  $("#homeStart")?.addEventListener("click", startWithActiveCase);
-  $("#case3d")?.addEventListener("click", startWithActiveCase);
-  $("#homeOrders")?.addEventListener("click", () => {
-    resetOrderSearch();
-    go("orders");
-  });
-}
-
-function homeCaseSlides() {
-  const count = HOME_CASES.length;
-  if (count < 2) {
-    return HOME_CASES.map((item, index) => ({ item, realIndex: index, clone: false }));
-  }
-  return [
-    { item: HOME_CASES[count - 1], realIndex: count - 1, clone: true },
-    ...HOME_CASES.map((item, index) => ({ item, realIndex: index, clone: false })),
-    { item: HOME_CASES[0], realIndex: 0, clone: true },
-  ];
-}
-
-function renderHomeCases() {
-  const track = $("#caseTrack");
-  const progress = $("#caseProgress");
-  if (!track || !progress) return;
-  track.innerHTML = homeCaseSlides().map(({ item, realIndex, clone }) => {
-    const style = STYLES.find((entry) => entry.id === item.styleId) || STYLES[0];
-    return `<article class="case-slide" data-index="${realIndex}"${clone ? ' data-clone="true" aria-hidden="true"' : ""}>
+  </svg>`;}
+let state={...DEFAULTS,trimStyles:{...DEFAULTS.trimStyles}};let activeTab="upper";let activeCaseIndex=0;let activeInstallKey="base";let previewApi=null;let previewFailed=false;let previewTimer=0;let previewPromise=null;let heroTransition=null;let lastRenderedRoute=null;const HERO_GROW_MS=820;let toastTimer=0;let pendingOrder=null;let lastOrder=null;let installApi=null;let installLoading=false;let installSig="";let sheetOpen=false;let sheetPageScroll=0;let lastFocused=null;let sheetCleanup=null;let miniInstallApi=null;let miniInstallToken=0;function sanitizeState(input){const next={...DEFAULTS,trimStyles:{...DEFAULTS.trimStyles}};for(const key of Object.keys(DEFAULTS)){if(key==="trimStyles")continue;const fallback=DEFAULTS[key];const value=input?.[key];if(typeof fallback==="number"){const number=Number(value);if(Number.isFinite(number))next[key]=number;}else if(typeof value==="string"){next[key]=value;}}
+if(!STYLES.some((style)=>style.id===next.styleId))next.styleId=DEFAULTS.styleId;if(!CURVES.some((curve)=>curve.id===next.surfaceType))next.surfaceType=DEFAULTS.surfaceType;if(!["middle","top","lower","lowest"].includes(next.surfaceStart))next.surfaceStart=DEFAULTS.surfaceStart;const legacy=input?.trimStyle;for(const position of TRIM_POSITIONS){const value=input?.trimStyles?.[position.key]??legacy;next.trimStyles[position.key]=TRIMS.some((trim)=>trim.id===value)?value:DEFAULTS.trimStyles[position.key];}
+return next;}
+function hasMiddleEdge(config=state){return config?.surfaceType!=="none"&&config?.surfaceStart!=="top";}
+function activeTrimPositions(config=state){return hasMiddleEdge(config)?TRIM_POSITIONS:TRIM_POSITIONS.filter((position)=>position.key!=="start");}
+function normalizeState(){state.hoodWidth=clamp(state.hoodWidth,DIMS.hoodWidth.min,DIMS.hoodWidth.max);state.hoodDepth=clamp(state.hoodDepth,DIMS.hoodDepth.min,DIMS.hoodDepth.max);state.rearHeight=clamp(state.rearHeight,DIMS.rearHeight.min,DIMS.rearHeight.max);state.frontHeight=clamp(state.frontHeight,DIMS.frontHeight.min,DIMS.frontHeight.max);state.chimneyWidth=clamp(state.chimneyWidth,DIMS.chimneyWidth.min,DIMS.chimneyWidth.max);state.chimneyDepth=clamp(state.chimneyDepth,DIMS.chimneyDepth.min,DIMS.chimneyDepth.max);state.chimneyHeight=clamp(state.chimneyHeight,DIMS.chimneyHeight.min,DIMS.chimneyHeight.max);state.shimHeight=clamp(state.shimHeight,0,60);state.frontHeight=Math.min(state.frontHeight,state.rearHeight);state.chimneyWidth=Math.min(state.chimneyWidth,state.hoodWidth-40);state.chimneyDepth=Math.min(state.chimneyDepth,state.hoodDepth-30);state.notchWidth=clamp(state.notchWidth??420,DIMS.notchWidth.min,Math.min(DIMS.notchWidth.max,state.hoodWidth+20-60));state.notchHeight=clamp(state.notchHeight??80,DIMS.notchHeight.min,Math.min(DIMS.notchHeight.max,state.frontHeight-24));state.notchOffset=clamp(state.notchOffset??0,-200,200);if(!NOTCH_SHAPES.some((item)=>item.id===state.notchShape))state.notchShape="arch";state.notchEnabled=state.notchEnabled!==false;const allowed=allowedStarts(state.surfaceType).map((item)=>item.id);if(!allowed.includes(state.surfaceStart))state.surfaceStart=allowed[0];}
+const currentStyle=()=>STYLES.find((style)=>style.id===state.styleId)||STYLES[0];const trimFor=(key)=>TRIMS.find((trim)=>trim.id===(state.trimStyles?.[key]||"none"))||TRIMS[0];function priceInfoFor(config=state){const details=activeTrimPositions(config).map((position)=>{const styleId=config.trimStyles?.[position.key]||"none";const trim=TRIMS.find((item)=>item.id===styleId)||TRIMS[0];return{...position,styleId:trim.id,styleName:trim.name,price:trim.price};});const trim=details.reduce((sum,item)=>sum+item.price,0);return{base:CONFIG.basePrice,trim,total:CONFIG.basePrice+trim,details};}
+function priceInfo(){return priceInfoFor(state);}
+const listPrice=(total)=>Math.round(Number(total)*1.4);function trimSummaryShort(config=state){const styles=config.trimStyles||{};return activeTrimPositions(config).map((position)=>{const trim=TRIMS.find((item)=>item.id===styles[position.key])||TRIMS[0];return trim.name;}).join(" / ");}
+function applyPreset(style){state.styleId=style.id;state.surfaceType=style.curve;state.surfaceStart=style.start;if(style.dims)Object.assign(state,style.dims);state.trimStyles={...(style.trims||{top:style.trim,start:style.trim,hoodTop:style.trim,hoodBottom:style.trim,})};if(style.notch){state.notchEnabled=style.notch.enabled!==false;if(style.notch.shape)state.notchShape=style.notch.shape;if(Number.isFinite(Number(style.notch.width)))state.notchWidth=Number(style.notch.width);if(Number.isFinite(Number(style.notch.height)))state.notchHeight=Number(style.notch.height);if(Number.isFinite(Number(style.notch.offset)))state.notchOffset=Number(style.notch.offset);}
+normalizeState();syncUI();setCustomizeTab("upper");}
+function heroMotionAllowed(){return!window.matchMedia("(prefers-reduced-motion: reduce)").matches&&typeof Element.prototype.animate==="function";}
+function resetHeroPreview(){const preview=$("#preview3d");if(!preview)return;preview.style.transform="";preview.style.transformOrigin="";}
+function finishHeroTransition(){const active=heroTransition;if(!active)return;heroTransition=null;clearTimeout(active.timer);if(active.animation){active.animation.onfinish=null;try{active.animation.cancel();}catch{}}
+resetHeroPreview();if(active.mode==="reverse"){suppressCaseScroll=false;active.homeView?.classList.remove("is-hero-reverse-home");active.homeView?.classList.add("no-view-in");active.view?.classList.remove("is-hero-reverse","is-hero-measuring","is-hero-entering","is-hero-active");applyRoute("home");normalizeCaseScroll();return;}
+if(active.view){active.view.classList.add("no-view-in");active.view.classList.remove("is-hero-measuring","is-hero-entering","is-hero-active");}}
+function abortHeroTransition(){const active=heroTransition;if(!active)return;heroTransition=null;clearTimeout(active.timer);if(active.animation){active.animation.onfinish=null;try{active.animation.cancel();}catch{}}
+resetHeroPreview();if(active.mode==="reverse"){suppressCaseScroll=false;active.homeView?.classList.remove("is-hero-reverse-home");active.view?.classList.remove("is-hero-reverse","is-hero-measuring","is-hero-entering","is-hero-active");}else if(active.view){active.view.classList.remove("is-hero-measuring","is-hero-entering","is-hero-active");}
+previewApi?.stopIntroSpin?.();}
+function startHeroTransition(sourceRect){const view=$(".view--customize");const previewEl=$("#preview3d");if(!view||!previewEl||!sourceRect||!heroMotionAllowed())return false;if(previewFailed||Math.abs(window.scrollY)>4)return false;if(sourceRect.width<8||sourceRect.height<8)return false;if(sourceRect.bottom<0||sourceRect.top>window.innerHeight)return false;const token={};heroTransition={token,mode:"forward",view,animation:null,timer:0};view.classList.add("is-hero-measuring");(async()=>{try{const api=await ensurePreview();if(!heroTransition||heroTransition.token!==token)return;if(!api||typeof api.modelScreenRect!=="function"){abortHeroTransition();go("customize");return;}
+api.resizeNow?.();api.cameraOverview?.(0);const dest=api.modelScreenRect();if(!dest||dest.width<8||dest.height<8){abortHeroTransition();go("customize");return;}
+const scale=clamp(sourceRect.height/dest.height,0.02,1);const dx=sourceRect.centerX-dest.centerX;const dy=sourceRect.centerY-dest.centerY;const startTransform=`translate(${dx}px, ${dy}px) scale(${scale})`;const previewRect=previewEl.getBoundingClientRect();const originX=dest.centerX-previewRect.left;const originY=dest.centerY-previewRect.top;view.classList.add("is-hero-entering");goNow("customize");if(!heroTransition||heroTransition.token!==token)return;previewEl.style.transformOrigin=`${originX}px ${originY}px`;previewEl.style.transform=startTransform;view.classList.remove("is-hero-measuring");view.classList.add("is-hero-active");api.introSpin?.(HERO_GROW_MS+100);const animation=previewEl.animate([{transform:startTransform,offset:0},{transform:"translate(0px, 0px) scale(1)",offset:1},],{duration:HERO_GROW_MS,easing:"cubic-bezier(0.2, 0.72, 0.18, 1)",fill:"both",});heroTransition.animation=animation;const finish=()=>finishHeroTransition();animation.onfinish=finish;heroTransition.timer=window.setTimeout(finish,HERO_GROW_MS+160);}catch(error){console.warn("首页 3D 模型衔接失败，改为普通切换",error);if(heroTransition&&heroTransition.token===token){const route=currentRoute();abortHeroTransition();if(route!=="customize")go("customize");}}})();return true;}
+function startReverseHero(){const previewEl=$("#preview3d");const view=$(".view--customize");const homeView=$('.view[data-view="home"]');if(!previewApi||!previewEl||!view||!homeView)return false;if(!caseThumbApi||typeof caseThumbApi.modelScreenRect!=="function")return false;if(previewFailed||!heroMotionAllowed()||Math.abs(window.scrollY)>4)return false;if(sheetOpen||view.classList.contains("is-hero-active"))return false;const startRect=previewApi.modelScreenRect?.();if(!startRect||startRect.width<8||startRect.height<8)return false;const token={};suppressCaseScroll=true;try{homeView.classList.add("is-hero-reverse-home");ensureCaseTrackPosition();const track=$("#caseTrack");if(track&&track.clientWidth){const targetLeft=virtualCaseForReal(activeCaseIndex)*track.clientWidth;if(Math.abs(track.scrollLeft-targetLeft)>1)track.scrollLeft=targetLeft;}
+caseThumbApi.resizeNow?.();const dest=caseThumbApi.modelScreenRect?.();const endDirection=caseThumbApi.getViewDirection?.()||null;if(!dest||dest.width<8||dest.height<8){homeView.classList.remove("is-hero-reverse-home");suppressCaseScroll=false;return false;}
+const endRect=(endDirection&&previewApi.modelScreenRect?.(endDirection))||startRect;const previewRect=previewEl.getBoundingClientRect();const originX=startRect.centerX-previewRect.left;const originY=startRect.centerY-previewRect.top;const scale=clamp(dest.height/endRect.height,0.02,1);const dx=dest.centerX-startRect.centerX-(endRect.centerX-startRect.centerX)*scale;const dy=dest.centerY-startRect.centerY-(endRect.centerY-startRect.centerY)*scale;const endTransform=`translate(${dx}px, ${dy}px) scale(${scale})`;heroTransition={token,mode:"reverse",view,homeView,animation:null,timer:0};previewEl.style.transformOrigin=`${originX}px ${originY}px`;view.classList.add("is-hero-active","is-hero-reverse");previewApi.introSpin?.(HERO_GROW_MS,{endDirection});const animation=previewEl.animate([{transform:"translate(0px, 0px) scale(1)",offset:0},{transform:endTransform,offset:1},],{duration:HERO_GROW_MS,easing:"cubic-bezier(0.4, 0, 0.2, 1)",fill:"both",});heroTransition.animation=animation;const finish=()=>finishHeroTransition();animation.onfinish=finish;heroTransition.timer=window.setTimeout(finish,HERO_GROW_MS+160);return true;}catch(error){console.warn("定制页 3D 模型退回失败，改为普通切换",error);suppressCaseScroll=false;if(heroTransition&&heroTransition.token===token)abortHeroTransition();homeView.classList.remove("is-hero-reverse-home");return false;}}
+function virtualCasePosition(){const track=$("#caseTrack");if(!track)return 0;return track.scrollLeft/Math.max(1,track.clientWidth);}
+function realCaseIndex(virtualIndex){const count=HOME_CASES.length;if(count<2)return 0;if(virtualIndex<=0)return count-1;if(virtualIndex>=count+1)return 0;return clamp(virtualIndex-1,0,count-1);}
+function nearestVirtualCase(){const count=HOME_CASES.length;if(count<2)return 0;return clamp(Math.round(virtualCasePosition()),0,count+1);}
+function currentCaseIndex(){return realCaseIndex(nearestVirtualCase());}
+function virtualCaseForReal(realIndex){const count=HOME_CASES.length;const target=clamp(realIndex,0,count-1);if(count<2)return 0;const position=virtualCasePosition();const candidates=[target+1];if(target===0)candidates.push(count+1);if(target===count-1)candidates.push(0);return candidates.reduce((best,value)=>(Math.abs(value-position)<Math.abs(best-position)?value:best),candidates[0]);}
+function startWithActiveCase(){if(heroTransition)return;stopCaseAuto();clearTimeout(caseSwipeTimer);const index=currentCaseIndex();updateCaseProgress(index);const item=HOME_CASES[index]||HOME_CASES[0];const style=STYLES.find((entry)=>entry.id===item.styleId)||STYLES[0];const sourceRect=caseThumbApi?.modelScreenRect?.()||null;state.shimHeight=0;applyPreset(style);clearTimeout(previewTimer);previewTimer=0;if(previewApi)previewApi.update({...state});if(startHeroTransition(sourceRect))return;go("customize");}
+const CASE_FLIP_MS=480;const CASE_FLIP_DEBOUNCE=120;const CASE_SCROLL_LOCK_MS=900;const caseModel={front:null,back:null,flipper:null,button:null,current:"",currentIndex:0,requested:"",requestedIndex:0,flipTarget:"",flipIndex:0,timer:0,animation:null,token:0,loaded:new Set(),};let caseScrollTarget=null;let caseScrollTimer=0;let caseSwipeTimer=0;let suppressCaseScroll=false;let caseInteracting=false;let caseThumbApi=null;let caseThumbLoading=false;let caseThumbFailed=false;let caseThumbIndex=0;let caseThumbScheduled=false;function casePreviewState(index){const item=HOME_CASES[clamp(index,0,HOME_CASES.length-1)]||HOME_CASES[0];const style=STYLES.find((entry)=>entry.id===item.styleId)||STYLES[0];const notch=style.notch||{};return{styleId:style.id,...style.dims,shimHeight:0,surfaceType:style.curve,surfaceStart:style.start,notchEnabled:notch.enabled!==false,notchShape:notch.shape||"arch",notchWidth:Number.isFinite(Number(notch.width))?Number(notch.width):420,notchHeight:Number.isFinite(Number(notch.height))?Number(notch.height):80,notchOffset:Number.isFinite(Number(notch.offset))?Number(notch.offset):0,trimStyles:{...(style.trims||{})},};}
+async function ensureCaseThumb(){if(caseThumbApi||caseThumbLoading||caseThumbFailed)return;if(currentRoute()!=="home")return;const container=$("#case3dCanvas");if(!container)return;caseThumbLoading=true;const initialIndex=activeCaseIndex;try{const module=await import(PREVIEW_MODULE_URL);if(caseThumbApi||caseThumbFailed||currentRoute()!=="home")return;const api=module.createPreview(container,casePreviewState(initialIndex),{thumbnail:true,aspectFit:true,fitMargin:1.9,direction:[0.42,0.14,1.5],pixelRatio:1.5,edges:false,});caseThumbApi=api;caseThumbIndex=initialIndex;if(activeCaseIndex!==initialIndex){api.update(casePreviewState(activeCaseIndex));caseThumbIndex=activeCaseIndex;}
+const canvas=container.querySelector("canvas");canvas?.addEventListener("webglcontextlost",(event)=>{event.preventDefault();caseThumbFailed=true;caseThumbApi?.dispose();caseThumbApi=null;caseThumbIndex=activeCaseIndex;caseModel.current=caseModelSrc(activeCaseIndex);caseModel.currentIndex=activeCaseIndex;if(caseModel.front)caseModel.front.src=caseModel.current;caseModel.button?.classList.remove("is-live");},{once:true});clearTimeout(caseModel.timer);caseModel.timer=0;if(caseModel.animation){caseModel.animation.cancel();caseModel.animation=null;}
+caseModel.current=caseModelSrc(caseThumbIndex);caseModel.currentIndex=caseThumbIndex;caseModel.requested=caseModel.current;caseModel.requestedIndex=caseThumbIndex;caseModel.button?.classList.remove("is-flipping");caseModel.button?.classList.add("is-live");}catch(error){caseThumbFailed=true;console.warn("首页 3D 模型初始化失败，保留图片兜底",error);}finally{caseThumbLoading=false;}}
+function scheduleCaseThumb(){if(caseThumbApi||caseThumbLoading||caseThumbFailed||caseThumbScheduled)return;caseThumbScheduled=true;const run=()=>{caseThumbScheduled=false;ensureCaseThumb();};if(typeof window.requestIdleCallback==="function"){window.requestIdleCallback(run,{timeout:600});}else{window.setTimeout(run,400);}}
+function caseModelSrc(index){const item=HOME_CASES[clamp(index,0,HOME_CASES.length-1)];return item?(item.model||HOME_3D_IMAGE||item.image):"";}
+function cacheCaseModelNodes(){caseModel.button=$("#case3d");caseModel.flipper=$(".case-3d-flipper");caseModel.front=$(".case-3d-front");caseModel.back=$(".case-3d-back");}
+function preloadCaseModels(){HOME_CASES.forEach((item)=>{const src=item.model||HOME_3D_IMAGE||item.image;if(!src||caseModel.loaded.has(src))return;const image=new Image();image.onload=()=>caseModel.loaded.add(src);image.onerror=()=>caseModel.loaded.add(src);image.src=src;});}
+function clearCaseScrollTarget(){caseScrollTarget=null;clearTimeout(caseScrollTimer);caseScrollTimer=0;}
+function resetCaseFlipper(){if(!caseModel.flipper)return;caseModel.flipper.style.transition="none";caseModel.flipper.style.transform="rotateY(0deg)";}
+function setCaseModel(index,{immediate=false}={}){const normalized=clamp(index,0,HOME_CASES.length-1);const src=caseModelSrc(normalized);if(!src)return;if(caseThumbApi){if(normalized===caseThumbIndex)return;const direction=normalized>=caseThumbIndex?1:-1;caseThumbIndex=normalized;caseModel.current=src;caseModel.currentIndex=normalized;caseModel.requested=src;caseModel.requestedIndex=normalized;clearTimeout(caseModel.timer);caseModel.timer=0;if(caseModel.animation){caseModel.animation.cancel();caseModel.animation=null;}
+caseModel.button?.classList.remove("is-flipping");caseModel.button?.setAttribute("aria-label",`查看${HOME_CASES[normalized].name}的 3D 模型`);caseThumbApi.spinToState(casePreviewState(normalized),{direction,duration:900});return;}
+if(src===caseModel.current&&!caseModel.animation&&!caseModel.timer)return;if(src===caseModel.requested&&(caseModel.animation||caseModel.timer))return;caseModel.requested=src;caseModel.requestedIndex=normalized;caseModel.button?.setAttribute("aria-label",`查看${HOME_CASES[normalized].name}的 3D 模型`);clearTimeout(caseModel.timer);caseModel.timer=0;if(immediate){startCaseFlip();}else{caseModel.timer=window.setTimeout(()=>{caseModel.timer=0;startCaseFlip();},CASE_FLIP_DEBOUNCE);}}
+function startCaseFlip(){const{button,flipper,front,back}=caseModel;const src=caseModel.requested;const index=caseModel.requestedIndex;if(!button||!flipper||!front||!back||!src)return;if(caseModel.animation){caseModel.animation.cancel();caseModel.animation=null;if(caseModel.flipTarget&&caseModel.flipTarget!==caseModel.current){caseModel.current=caseModel.flipTarget;caseModel.currentIndex=caseModel.flipIndex;front.src=caseModel.current;}
+resetCaseFlipper();}
+if(src===caseModel.current){caseModel.requested=src;caseModel.requestedIndex=index;resetCaseFlipper();button.classList.remove("is-flipping");return;}
+const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;if(reduceMotion){front.src=src;caseModel.current=src;caseModel.currentIndex=index;caseModel.flipTarget=src;caseModel.flipIndex=index;resetCaseFlipper();button.classList.remove("is-flipping");return;}
+const direction=index>=caseModel.currentIndex?1:-1;const token=++caseModel.token;caseModel.flipTarget=src;caseModel.flipIndex=index;back.src=src;resetCaseFlipper();button.classList.add("is-flipping");const play=()=>{if(token!==caseModel.token)return;if(typeof flipper.animate!=="function"){front.src=src;caseModel.current=src;caseModel.currentIndex=index;resetCaseFlipper();button.classList.remove("is-flipping");return;}
+void flipper.offsetWidth;const animation=flipper.animate([{transform:"rotateY(0deg) scale(1)",offset:0},{transform:`rotateY(${direction * 90}deg) scale(0.94)`,offset:0.5},{transform:`rotateY(${direction * 180}deg) scale(1)`,offset:1},],{duration:CASE_FLIP_MS,easing:"cubic-bezier(0.3, 0, 0.2, 1)",fill:"forwards",});caseModel.animation=animation;let finished=false;let fallback=0;const finish=()=>{if(finished||token!==caseModel.token)return;finished=true;clearTimeout(fallback);front.src=src;caseModel.current=src;caseModel.currentIndex=index;animation.cancel();caseModel.animation=null;resetCaseFlipper();button.classList.remove("is-flipping");};animation.onfinish=finish;fallback=window.setTimeout(finish,CASE_FLIP_MS+80);};if(back.complete&&back.naturalWidth){play();}else{const onReady=()=>{back.onload=null;back.onerror=null;play();};back.onload=onReady;back.onerror=onReady;}}
+function updateCaseProgress(index){activeCaseIndex=clamp(index,0,HOME_CASES.length-1);$$("#caseProgress button").forEach((button,buttonIndex)=>{button.classList.toggle("is-active",buttonIndex===activeCaseIndex);const fill=button.querySelector(".case-fill");if(fill)fill.style.transform="scaleX(0)";});}
+function snapToCase(index){const track=$("#caseTrack");if(!track)return;const target=clamp(index,0,HOME_CASES.length-1);const virtual=virtualCaseForReal(target);caseScrollTarget=target;clearTimeout(caseScrollTimer);caseScrollTimer=window.setTimeout(()=>{caseScrollTarget=null;caseScrollTimer=0;},CASE_SCROLL_LOCK_MS);updateCaseProgress(target);setCaseModel(target,{immediate:true});track.scrollTo({left:virtual*track.clientWidth,behavior:"smooth"});scheduleCaseNormalize();}
+function snapToNearestCase(){snapToCase(realCaseIndex(nearestVirtualCase()));}
+let caseSettleTimer=0;function normalizeCaseScroll(){const track=$("#caseTrack");const count=HOME_CASES.length;if(!track||count<2||caseInteracting||suppressCaseScroll)return;const position=virtualCasePosition();const nearest=Math.round(position);if(Math.abs(position-nearest)>0.002)return;let target=0;if(nearest<=0){target=count*track.clientWidth;}else if(nearest>=count+1){target=track.clientWidth;}else{return;}
+const snap=track.style.scrollSnapType;const behavior=track.style.scrollBehavior;track.style.scrollSnapType="none";track.style.scrollBehavior="auto";track.scrollLeft=target;void track.offsetWidth;track.style.scrollSnapType=snap;track.style.scrollBehavior=behavior;}
+function scheduleCaseNormalize(){clearTimeout(caseSettleTimer);caseSettleTimer=window.setTimeout(normalizeCaseScroll,160);}
+function ensureCaseTrackPosition(){const track=$("#caseTrack");if(!track||HOME_CASES.length<2)return;const width=track.clientWidth;if(!width)return;if(track.scrollLeft<1)track.scrollLeft=width;}
+const CASE_INTERVAL=5000;let caseAutoRaf=0;let caseAutoStart=0;let caseAutoElapsed=0;let caseAutoPaused=false;function paintCaseFill(progress){const button=$$("#caseProgress button")[activeCaseIndex];const fill=button?.querySelector(".case-fill");if(fill)fill.style.transform=`scaleX(${Math.min(1, Math.max(0, progress))})`;}
+function stopCaseAuto(){if(caseAutoRaf)cancelAnimationFrame(caseAutoRaf);caseAutoRaf=0;}
+function restartCaseAuto(){stopCaseAuto();if(currentRoute()!=="home"||document.hidden)return;caseAutoElapsed=0;caseAutoStart=performance.now();caseAutoPaused=false;paintCaseFill(0);const tick=(now)=>{if(caseAutoPaused){caseAutoStart=now-caseAutoElapsed;caseAutoRaf=requestAnimationFrame(tick);return;}
+caseAutoElapsed=now-caseAutoStart;const progress=Math.min(1,caseAutoElapsed/CASE_INTERVAL);paintCaseFill(progress);if(progress>=1){const next=(activeCaseIndex+1)%HOME_CASES.length;snapToCase(next);caseAutoElapsed=0;caseAutoStart=now;}
+caseAutoRaf=requestAnimationFrame(tick);};caseAutoRaf=requestAnimationFrame(tick);}
+function pauseCaseAuto(){caseAutoPaused=true;}
+function bindCaseEvents(){const track=$("#caseTrack");if(!track)return;track.addEventListener("scroll",()=>{if(suppressCaseScroll)return;const index=realCaseIndex(Math.round(virtualCasePosition()));updateCaseProgress(index);if(!caseInteracting)scheduleCaseNormalize();if(caseScrollTarget!==null){if(index===caseScrollTarget)clearCaseScrollTarget();return;}
+setCaseModel(index);},{passive:true});const syncCaseAfterSwipe=()=>{clearTimeout(caseSwipeTimer);caseInteracting=false;let attempts=0;const settle=()=>{const position=virtualCasePosition();const nearest=nearestVirtualCase();if(Math.abs(position-nearest)>0.002&&attempts++<20){caseSwipeTimer=window.setTimeout(settle,120);return;}
+normalizeCaseScroll();const index=realCaseIndex(nearest);updateCaseProgress(index);setCaseModel(index);restartCaseAuto();};caseSwipeTimer=window.setTimeout(settle,260);};track.addEventListener("touchstart",()=>{clearTimeout(caseSwipeTimer);caseInteracting=true;clearCaseScrollTarget();pauseCaseAuto();},{passive:true});track.addEventListener("touchend",syncCaseAfterSwipe,{passive:true});track.addEventListener("touchcancel",syncCaseAfterSwipe,{passive:true});let dragging=false;let moved=false;let dragStartX=0;let dragStartScroll=0;track.addEventListener("pointerdown",(event)=>{clearTimeout(caseSwipeTimer);caseInteracting=true;clearCaseScrollTarget();pauseCaseAuto();if(event.pointerType!=="mouse"||event.button!==0)return;dragging=true;moved=false;dragStartX=event.clientX;dragStartScroll=track.scrollLeft;track.classList.add("is-dragging");});window.addEventListener("pointermove",(event)=>{if(!dragging)return;const dx=event.clientX-dragStartX;if(Math.abs(dx)>5)moved=true;track.scrollLeft=dragStartScroll-dx;});const endDrag=()=>{caseInteracting=false;if(!dragging)return;dragging=false;track.classList.remove("is-dragging");if(moved)snapToNearestCase();restartCaseAuto();};window.addEventListener("pointerup",endDrag);window.addEventListener("pointercancel",endDrag);window.addEventListener("blur",endDrag);$("#caseProgress")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-case-index]");if(!button)return;snapToCase(Number(button.dataset.caseIndex));restartCaseAuto();});$("#homeStart")?.addEventListener("click",startWithActiveCase);$("#case3d")?.addEventListener("click",startWithActiveCase);$("#homeOrders")?.addEventListener("click",()=>{resetOrderSearch();go("orders");});}
+function homeCaseSlides(){const count=HOME_CASES.length;if(count<2){return HOME_CASES.map((item,index)=>({item,realIndex:index,clone:false}));}
+return[{item:HOME_CASES[count-1],realIndex:count-1,clone:true},...HOME_CASES.map((item,index)=>({item,realIndex:index,clone:false})),{item:HOME_CASES[0],realIndex:0,clone:true},];}
+function renderHomeCases(){const track=$("#caseTrack");const progress=$("#caseProgress");if(!track||!progress)return;track.innerHTML=homeCaseSlides().map(({item,realIndex,clone})=>{const style=STYLES.find((entry)=>entry.id===item.styleId)||STYLES[0];return`<article class="case-slide" data-index="${realIndex}"${clone ? ' data-clone="true" aria-hidden="true"' : ""}>
       <img class="case-image ${item.fit === "cover" ? "is-cover" : ""}" src="${esc(item.image)}" alt="${esc(item.name)}烟机罩案例" draggable="false" />
       <div class="case-shade"></div>
       <div class="case-meta">
         <h2 class="case-name">${esc(item.name)}</h2>
         <p class="case-spec">${esc(style.desc)} · ${esc(style.tone)}色</p>
       </div>
-    </article>`;
-  }).join("");
-  progress.innerHTML = HOME_CASES.map((item, index) =>
-    `<button type="button" data-case-index="${index}" aria-label="查看案例 ${index + 1}"><span class="case-fill"></span></button>`
-  ).join("");
-  cacheCaseModelNodes();
-  const first = HOME_CASES[0];
-  const firstSrc = first ? (first.model || HOME_3D_IMAGE || first.image) : "";
-  if (caseModel.front) caseModel.front.src = firstSrc;
-  if (caseModel.back) caseModel.back.removeAttribute("src");
-  caseModel.current = firstSrc;
-  caseModel.currentIndex = 0;
-  caseModel.requested = firstSrc;
-  caseModel.requestedIndex = 0;
-  caseModel.flipTarget = firstSrc;
-  caseModel.flipIndex = 0;
-  caseModel.button?.setAttribute("aria-label", first ? `查看${first.name}的 3D 模型` : "查看 3D 模型");
-  // 首页隐藏时 clientWidth 为 0，先标记；显示后由 ensureCaseTrackPosition 定位到真实首张。
-  track.scrollLeft = HOME_CASES.length > 1 ? track.clientWidth : 0;
-  // 预热所有案例大图（含首尾克隆），避免循环到克隆页时出现一帧空白/闪烁。
-  $$(".case-slide img").forEach((image) => {
-    if (typeof image.decode === "function") image.decode().catch(() => {});
-  });
-  preloadCaseModels();
-  bindCaseEvents();
-  updateCaseProgress(0);
-}
-
-/* ---------- 定制表单 ---------- */
-function dimRow(key) {
-  const dim = DIMS[key];
-  return `<div class="dim-row" data-dim="${key}">
+    </article>`;}).join("");progress.innerHTML=HOME_CASES.map((item,index)=>`<button type="button" data-case-index="${index}" aria-label="查看案例 ${index + 1}"><span class="case-fill"></span></button>`).join("");cacheCaseModelNodes();const first=HOME_CASES[0];const firstSrc=first?(first.model||HOME_3D_IMAGE||first.image):"";if(caseModel.front)caseModel.front.src=firstSrc;if(caseModel.back)caseModel.back.removeAttribute("src");caseModel.current=firstSrc;caseModel.currentIndex=0;caseModel.requested=firstSrc;caseModel.requestedIndex=0;caseModel.flipTarget=firstSrc;caseModel.flipIndex=0;caseModel.button?.setAttribute("aria-label",first?`查看${first.name}的 3D 模型`:"查看 3D 模型");track.scrollLeft=HOME_CASES.length>1?track.clientWidth:0;$$(".case-slide img").forEach((image)=>{if(typeof image.decode==="function")image.decode().catch(()=>{});});preloadCaseModels();bindCaseEvents();updateCaseProgress(0);}
+function dimRow(key){const dim=DIMS[key];return`<div class="dim-row" data-dim="${key}">
     <div class="dim-label"><b>${dim.label}</b></div>
     <div class="stepper">
       <button type="button" data-step="-${dim.step}" aria-label="减少${dim.label}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
@@ -1351,1083 +158,132 @@ function dimRow(key) {
       <span class="unit">mm</span>
       <button type="button" data-step="${dim.step}" aria-label="增加${dim.label}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M8 4v8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
     </div>
-  </div>`;
-}
-
-function renderDims() {
-  $("#chimneyDims").innerHTML = ["chimneyWidth", "chimneyDepth", "chimneyHeight"].map(dimRow).join("");
-  $("#hoodDims").innerHTML = ["hoodWidth", "hoodDepth", "rearHeight", "frontHeight"].map(dimRow).join("");
-}
-
-function renderNotchOptions() {
-  const root = $("#notchOptions");
-  if (!root) return;
-  root.innerHTML = NOTCH_SHAPES.map((shape) =>
-    `<button class="notch-option" type="button" data-notch="${shape.id}">${notchArt(shape.id)}<b>${shape.label}</b></button>`
-  ).join("");
-}
-
-function renderNotchDims() {
-  const root = $("#notchDims");
-  if (!root) return;
-  root.innerHTML = ["notchWidth", "notchHeight"].map(dimRow).join("");
-}
-
-function renderCurveOptions() {
-  $("#curveOptions").innerHTML = CURVES.map((curve) => `
+  </div>`;}
+function renderDims(){$("#chimneyDims").innerHTML=["chimneyWidth","chimneyDepth","chimneyHeight"].map(dimRow).join("");$("#hoodDims").innerHTML=["hoodWidth","hoodDepth","rearHeight","frontHeight"].map(dimRow).join("");}
+function renderNotchOptions(){const root=$("#notchOptions");if(!root)return;root.innerHTML=NOTCH_SHAPES.map((shape)=>`<button class="notch-option" type="button" data-notch="${shape.id}">${notchArt(shape.id)}<b>${shape.label}</b></button>`).join("");}
+function renderNotchDims(){const root=$("#notchDims");if(!root)return;root.innerHTML=["notchWidth","notchHeight"].map(dimRow).join("");}
+function renderCurveOptions(){$("#curveOptions").innerHTML=CURVES.map((curve)=>`
     <button class="curve-option" type="button" data-curve="${curve.id}">
       ${curveArt(curve.id)}<b>${curve.label}</b>
     </button>
-  `).join("");
-}
-
-function renderStartOptions() {
-  $("#startOptions").innerHTML = allowedStarts(state.surfaceType)
-    .map((option) => `<button type="button" data-start="${option.id}">${option.label}</button>`)
-    .join("");
-}
-
-function renderTrimList() {
-  const list = $("#trimList");
-  if (!list) return;
-  list.innerHTML = activeTrimPositions().map((position) => {
-    const trim = trimFor(position.key);
-    return `<button class="trim-row" type="button" data-trim-position="${position.key}">
+  `).join("");}
+function renderStartOptions(){$("#startOptions").innerHTML=allowedStarts(state.surfaceType).map((option)=>`<button type="button" data-start="${option.id}">${option.label}</button>`).join("");}
+function renderTrimList(){const list=$("#trimList");if(!list)return;list.innerHTML=activeTrimPositions().map((position)=>{const trim=trimFor(position.key);return`<button class="trim-row" type="button" data-trim-position="${position.key}">
       <span class="trim-row-art" aria-hidden="true">${trimArt(trim.id)}</span>
       <span class="trim-row-main"><b class="trim-row-name">${position.name}</b></span>
       <span class="trim-row-current">${trim.name}</span>
       <span class="trim-row-price">${trim.price ? fmt(trim.price) : "免费"}</span>
       <svg class="trim-row-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m8 5 5 5-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>`;
-  }).join("");
-}
-
-function openTrimPicker(key) {
-  const position = TRIM_POSITIONS.find((item) => item.key === key);
-  if (!position) return;
-  const body = `<div class="trim-picker-grid">${TRIMS.map((trim) => `
-    <button class="trim-picker-card ${state.trimStyles?.[key] === trim.id ? "is-active" : ""}" type="button" data-pick-trim="${key}" data-trim-style="${trim.id}">
-      <span class="trim-picker-art">${trimArt(trim.id)}</span>
-      <span class="trim-picker-copy"><b>${trim.name}</b><span>${trim.desc}</span><em>${trim.price ? fmt(trim.price) : "免费"}</em></span>
-    </button>`).join("")}</div>`;
-  openSheet({
-    title: `选择${position.name}`,
-    body,
-    backdrop: "light",
-    actions: [{ label: "完成", kind: "primary", onClick: closeSheet }],
-  });
-}
-
-function setDim(key, value, round = true) {
-  const dim = DIMS[key];
-  let next = clamp(value, dim.min, dim.max);
-  if (round) next = Math.round(next / dim.step) * dim.step;
-  state[key] = next;
-  if (key.startsWith("notch")) state.notchEnabled = true;
-  normalizeState();
-  syncUI({ activeInput: null });
-  markDirty();
-}
-
-function markDirty() {
-  // 暂不做自动保存；保存能力后续再加。
-}
-
-function syncUI({ activeInput = null, writeInputs = true } = {}) {
-  normalizeState();
-  if (writeInputs) {
-    $$(".dim-row").forEach((row) => {
-      const input = row.querySelector("input");
-      if (input && input !== activeInput) input.value = state[row.dataset.dim];
-    });
-  }
-
-  const shimValue = $("#shimValue");
-  if (shimValue) shimValue.textContent = state.shimHeight;
-
-  $$("#curveOptions .curve-option").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.curve === state.surfaceType);
-  });
-  $$("#notchOptions .notch-option").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.notch === state.notchShape);
-  });
-  const noSide = state.surfaceType === "none";
-  if ($("#startLabel")) $("#startLabel").hidden = noSide;
-  if ($("#startOptions")) $("#startOptions").hidden = noSide;
-  const startOptions = allowedStarts(state.surfaceType);
-  const signature = startOptions.map((item) => `${item.id}:${item.label}`).join(",");
-  const currentSignature = $$("#startOptions button").map((button) => `${button.dataset.start}:${button.textContent}`).join(",");
-  if (signature !== currentSignature) {
-    renderStartOptions();
-  }
-  $$("#startOptions button").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.start === state.surfaceStart);
-  });
-
-  renderTrimList();
-
-  const width = state.hoodWidth + 20;
-  const totalHeight = state.rearHeight + state.chimneyHeight + state.shimHeight;
-  if ($("#specWidth")) $("#specWidth").textContent = String(width);
-  if ($("#specHeight")) $("#specHeight").textContent = String(totalHeight);
-  if ($("#specShim")) $("#specShim").textContent = String(state.shimHeight);
-
-  const price = priceInfo();
-  if ($("#totalPrice")) $("#totalPrice").textContent = fmt(price.total);
-  if ($("#breakdown")) $("#breakdown").textContent = price.trim ? `主体 ${fmt(price.base)} + 装饰 ${fmt(price.trim)}` : `主体 ${fmt(price.base)} · 无装饰`;
-  if ($("#installPrice")) $("#installPrice").textContent = fmt(price.total);
-  if ($("#installPriceBtn")) $("#installPriceBtn").textContent = fmt(price.total);
-  if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
-  if ($("#checkoutOriginalPrice")) $("#checkoutOriginalPrice").textContent = fmt(listPrice(price.total));
-
-  schedulePreview();
-}
-
-function schedulePreview() {
-  // 入场衔接期间模型由 introSpin 接管，跳过延迟重建，避免动画中途跳一下。
-  if (heroTransition) return;
-  if (previewFailed) {
-    const fallback = $("#previewFallback");
-    if (fallback) fallback.innerHTML = hoodArt(currentStyle(), { transparent: true });
-    return;
-  }
-  clearTimeout(previewTimer);
-  previewTimer = window.setTimeout(() => {
-    if (previewApi) previewApi.update({ ...state });
-  }, 70);
-}
-
-function ensurePreview() {
-  if (previewApi) return Promise.resolve(previewApi);
-  if (previewPromise) return previewPromise;
-  previewPromise = (async () => {
-    try {
-      const module = await import(PREVIEW_MODULE_URL);
-      if (!previewApi) previewApi = module.createPreview($("#preview3d"), { ...state });
-      return previewApi;
-    } catch (error) {
-      previewFailed = true;
-      const fallback = $("#previewFallback");
-      if (fallback) fallback.innerHTML = hoodArt(currentStyle(), { transparent: true });
-      $(".view--customize")?.classList.add("is-fallback");
-      return null;
-    } finally {
-      previewPromise = null;
-    }
-  })();
-  return previewPromise;
-}
-
-/* ---------- 路由 ---------- */
-const ROUTES = ["home", "orders", "order", "customize", "install"];
-function currentRoute() {
-  const route = location.hash.replace(/^#\/?/, "");
-  return ROUTES.includes(route) ? route : "home";
-}
-function go(route, { replace = false } = {}) {
-  const hash = route === "home" ? "#/" : `#/${route}`;
-  if (location.hash === hash) {
-    renderRoute();
-    return;
-  }
-  if (replace) {
-    history.replaceState(null, "", hash);
-    renderRoute();
-  } else {
-    location.hash = hash;
-  }
-}
-
-// 同步切路由：入场衔接需要在同一帧内完成「隐藏首页 + 显示定制页 + 摆好首帧」。
-function goNow(route) {
-  const hash = route === "home" ? "#/" : `#/${route}`;
-  if (location.hash === hash) {
-    renderRoute();
-    return;
-  }
-  history.pushState(null, "", hash);
-  renderRoute();
-}
-function backTarget() {
-  return ({ orders: "home", order: "orders", customize: "home", install: "customize" })[currentRoute()] || "home";
-}
-
-function renderRoute() {
-  const route = currentRoute();
-  // 定制页 → 首页：先播放主模型缩回小图的动画，动画结束再真正切换视图。
-  if (route === "home" && lastRenderedRoute === "customize" && !heroTransition && startReverseHero()) return;
-  applyRoute(route);
-}
-
-function applyRoute(route) {
-  if (route !== "customize") {
-    abortHeroTransition();
-    $(".view--customize")?.classList.remove("no-view-in", "is-hero-measuring", "is-hero-entering", "is-hero-active", "is-hero-reverse");
-  }
-  if (route !== "home") {
-    $('.view[data-view="home"]')?.classList.remove("no-view-in", "is-hero-reverse-home");
-  }
-  $$(".view").forEach((view) => view.classList.toggle("is-active", view.dataset.view === route));
-  closeSheet();
-  if (route === "home") {
-    ensureCaseTrackPosition();
-    restartCaseAuto();
-    scheduleCaseThumb();
-  } else {
-    stopCaseAuto();
-  }
-  if (route === "orders") {
-    renderOrdersPage();
-  }
-  if (route === "order") {
-    renderOrderDetail();
-  } else {
-    disposeOrderPreview();
-  }
-  if (route === "customize") {
-    ensurePreview();
-    syncUI();
-  }
-  if (route === "install") {
-    updateInstallPrice();
-    renderInstallTabs();
-    setInstallStep(activeInstallKey, true);
-  }
-  lastRenderedRoute = route;
-  window.scrollTo(0, 0);
-}
-
-/* ---------- Tab ---------- */
-function setCustomizeTab(tab) {
-  activeTab = tab;
-  $$("#customizeTabs button").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.tab === tab)));
-  $$(".custom-panel").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.panel === tab));
-  const panels = $(".custom-panels");
-  if (panels) panels.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-/* ---------- 安装 ---------- */
-const STEP_MARKS = ["①", "②", "③", "④", "⑤"];
-const stepMark = (index) => STEP_MARKS[index] || String(index + 1);
-
-const INSTALL_STEPS = {
-  base: {
-    name: "主体拼接",
-    title: "主体按顺序拼装",
-    desc: "有垫高先贴垫板，再装侧板、顶板、正面。",
-  },
-  curve: {
-    name: "曲面装饰",
-    title: "曲面压到接缝上",
-    desc: "对准上竖与下横的接缝，从上往下压合。",
-  },
-  trim: {
-    name: "装饰条",
-    title: "切角后再贴装饰条",
-    desc: "两端切 45° 海棠角，贴回罩体压紧 30 秒。",
-  },
-  paint: {
-    name: "刷漆",
-    title: "刷成可可蛋奶色",
-    desc: "薄涂两遍，间隔 30 分钟，阴干 24 小时。",
-  },
-};
-
-function installStepsFor(config = {}) {
-  const styles = config.trimStyles || {
-    top: config.trimStyle || "none",
-    start: config.trimStyle || "none",
-    hoodTop: config.trimStyle || "none",
-    hoodBottom: config.trimStyle || "none",
-  };
-  const hasCurve = config.surfaceType !== "flat" && config.surfaceType !== "none";
-  const hasTrim = activeTrimPositions(config).some(({ key }) => (styles[key] || "none") !== "none");
-  // 没有对应部件的步骤直接省略，序号按剩余步骤重新排。
-  return ["base", "curve", "trim", "paint"]
-    .filter((key) => (key !== "curve" || hasCurve) && (key !== "trim" || hasTrim))
-    .map((key) => ({ key, ...INSTALL_STEPS[key] }));
-}
-
-function installSteps() {
-  return installStepsFor(state);
-}
-
-function renderInstallTabs() {
-  const nav = $("#installTabs");
-  const steps = installSteps();
-  if (nav) {
-    nav.innerHTML = steps.map((step, index) => `
+    </button>`;}).join("");}
+function openTrimPicker(key){const position=TRIM_POSITIONS.find((item)=>item.key===key);if(!position)return;const body=`<div class="trim-picker-grid">${TRIMS.map((trim) => `<button class="trim-picker-card ${state.trimStyles?.[key] === trim.id ? "is-active" : ""}"type="button"data-pick-trim="${key}"data-trim-style="${trim.id}"><span class="trim-picker-art">${trimArt(trim.id)}</span><span class="trim-picker-copy"><b>${trim.name}</b><span>${trim.desc}</span><em>${trim.price?fmt(trim.price):"免费"}</em></span></button>`).join("")}</div>`;openSheet({title:`选择${position.name}`,body,backdrop:"light",actions:[{label:"完成",kind:"primary",onClick:closeSheet}],});}
+function setDim(key,value,round=true){const dim=DIMS[key];let next=clamp(value,dim.min,dim.max);if(round)next=Math.round(next/dim.step)*dim.step;state[key]=next;if(key.startsWith("notch"))state.notchEnabled=true;normalizeState();syncUI({activeInput:null});markDirty();}
+function markDirty(){}
+function syncUI({activeInput=null,writeInputs=true}={}){normalizeState();if(writeInputs){$$(".dim-row").forEach((row)=>{const input=row.querySelector("input");if(input&&input!==activeInput)input.value=state[row.dataset.dim];});}
+const shimValue=$("#shimValue");if(shimValue)shimValue.textContent=state.shimHeight;$$("#curveOptions .curve-option").forEach((button)=>{button.classList.toggle("is-active",button.dataset.curve===state.surfaceType);});$$("#notchOptions .notch-option").forEach((button)=>{button.classList.toggle("is-active",button.dataset.notch===state.notchShape);});const noSide=state.surfaceType==="none";if($("#startLabel"))$("#startLabel").hidden=noSide;if($("#startOptions"))$("#startOptions").hidden=noSide;const startOptions=allowedStarts(state.surfaceType);const signature=startOptions.map((item)=>`${item.id}:${item.label}`).join(",");const currentSignature=$$("#startOptions button").map((button)=>`${button.dataset.start}:${button.textContent}`).join(",");if(signature!==currentSignature){renderStartOptions();}
+$$("#startOptions button").forEach((button)=>{button.classList.toggle("is-active",button.dataset.start===state.surfaceStart);});renderTrimList();const width=state.hoodWidth+20;const totalHeight=state.rearHeight+state.chimneyHeight+state.shimHeight;if($("#specWidth"))$("#specWidth").textContent=String(width);if($("#specHeight"))$("#specHeight").textContent=String(totalHeight);if($("#specShim"))$("#specShim").textContent=String(state.shimHeight);const price=priceInfo();if($("#totalPrice"))$("#totalPrice").textContent=fmt(price.total);if($("#breakdown"))$("#breakdown").textContent=price.trim?`主体 ${fmt(price.base)} + 装饰 ${fmt(price.trim)}`:`主体 ${fmt(price.base)} · 无装饰`;if($("#installPrice"))$("#installPrice").textContent=fmt(price.total);if($("#installPriceBtn"))$("#installPriceBtn").textContent=fmt(price.total);if($("#checkoutPrice"))$("#checkoutPrice").textContent=fmt(price.total);if($("#checkoutOriginalPrice"))$("#checkoutOriginalPrice").textContent=fmt(listPrice(price.total));schedulePreview();}
+function schedulePreview(){if(heroTransition)return;if(previewFailed){const fallback=$("#previewFallback");if(fallback)fallback.innerHTML=hoodArt(currentStyle(),{transparent:true});return;}
+clearTimeout(previewTimer);previewTimer=window.setTimeout(()=>{if(previewApi)previewApi.update({...state});},70);}
+function ensurePreview(){if(previewApi)return Promise.resolve(previewApi);if(previewPromise)return previewPromise;previewPromise=(async()=>{try{const module=await import(PREVIEW_MODULE_URL);if(!previewApi)previewApi=module.createPreview($("#preview3d"),{...state});return previewApi;}catch(error){previewFailed=true;const fallback=$("#previewFallback");if(fallback)fallback.innerHTML=hoodArt(currentStyle(),{transparent:true});$(".view--customize")?.classList.add("is-fallback");return null;}finally{previewPromise=null;}})();return previewPromise;}
+const ROUTES=["home","orders","order","customize","install"];function currentRoute(){const route=location.hash.replace(/^#\/?/,"");return ROUTES.includes(route)?route:"home";}
+function go(route,{replace=false}={}){const hash=route==="home"?"#/":`#/${route}`;if(location.hash===hash){renderRoute();return;}
+if(replace){history.replaceState(null,"",hash);renderRoute();}else{location.hash=hash;}}
+function goNow(route){const hash=route==="home"?"#/":`#/${route}`;if(location.hash===hash){renderRoute();return;}
+history.pushState(null,"",hash);renderRoute();}
+function backTarget(){return({orders:"home",order:"orders",customize:"home",install:"customize"})[currentRoute()]||"home";}
+function renderRoute(){const route=currentRoute();if(route==="home"&&lastRenderedRoute==="customize"&&!heroTransition&&startReverseHero())return;applyRoute(route);}
+function applyRoute(route){if(route!=="customize"){abortHeroTransition();$(".view--customize")?.classList.remove("no-view-in","is-hero-measuring","is-hero-entering","is-hero-active","is-hero-reverse");}
+if(route!=="home"){$('.view[data-view="home"]')?.classList.remove("no-view-in","is-hero-reverse-home");}
+$$(".view").forEach((view)=>view.classList.toggle("is-active",view.dataset.view===route));closeSheet();if(route==="home"){ensureCaseTrackPosition();restartCaseAuto();scheduleCaseThumb();}else{stopCaseAuto();}
+if(route==="orders"){renderOrdersPage();}
+if(route==="order"){renderOrderDetail();}else{disposeOrderPreview();}
+if(route==="customize"){ensurePreview();syncUI();}
+if(route==="install"){updateInstallPrice();renderInstallTabs();setInstallStep(activeInstallKey,true);}
+lastRenderedRoute=route;window.scrollTo(0,0);}
+function setCustomizeTab(tab){activeTab=tab;$$("#customizeTabs button").forEach((button)=>button.setAttribute("aria-selected",String(button.dataset.tab===tab)));$$(".custom-panel").forEach((panel)=>panel.classList.toggle("is-active",panel.dataset.panel===tab));const panels=$(".custom-panels");if(panels)panels.scrollTo({top:0,behavior:"smooth"});}
+const STEP_MARKS=["①","②","③","④","⑤"];const stepMark=(index)=>STEP_MARKS[index]||String(index+1);const INSTALL_STEPS={base:{name:"主体拼接",title:"主体按顺序拼装",desc:"有垫高先贴垫板，再装侧板、顶板、正面。",},curve:{name:"曲面装饰",title:"曲面压到接缝上",desc:"对准上竖与下横的接缝，从上往下压合。",},trim:{name:"装饰条",title:"切角后再贴装饰条",desc:"两端切 45° 海棠角，贴回罩体压紧 30 秒。",},paint:{name:"刷漆",title:"刷成可可蛋奶色",desc:"薄涂两遍，间隔 30 分钟，阴干 24 小时。",},};function installStepsFor(config={}){const styles=config.trimStyles||{top:config.trimStyle||"none",start:config.trimStyle||"none",hoodTop:config.trimStyle||"none",hoodBottom:config.trimStyle||"none",};const hasCurve=config.surfaceType!=="flat"&&config.surfaceType!=="none";const hasTrim=activeTrimPositions(config).some(({key})=>(styles[key]||"none")!=="none");return["base","curve","trim","paint"].filter((key)=>(key!=="curve"||hasCurve)&&(key!=="trim"||hasTrim)).map((key)=>({key,...INSTALL_STEPS[key]}));}
+function installSteps(){return installStepsFor(state);}
+function renderInstallTabs(){const nav=$("#installTabs");const steps=installSteps();if(nav){nav.innerHTML=steps.map((step,index)=>`
       <button role="tab" aria-selected="false" data-key="${step.key}" type="button">
         <span>${stepMark(index)}</span>${step.name}
       </button>
-    `).join("");
-  }
-  if (!steps.some((step) => step.key === activeInstallKey)) activeInstallKey = steps[0].key;
-  return steps;
-}
-
-function installStateSignature() {
-  return JSON.stringify({
-    hoodWidth: state.hoodWidth,
-    hoodDepth: state.hoodDepth,
-    rearHeight: state.rearHeight,
-    frontHeight: state.frontHeight,
-    chimneyWidth: state.chimneyWidth,
-    chimneyDepth: state.chimneyDepth,
-    chimneyHeight: state.chimneyHeight,
-    shimHeight: state.shimHeight,
-    surfaceType: state.surfaceType,
-    surfaceStart: state.surfaceStart,
-    styleId: state.styleId,
-    trimStyles: state.trimStyles,
-  });
-}
-
-function updateInstallPrice() {
-  const total = priceInfo().total;
-  if ($("#installPrice")) $("#installPrice").textContent = fmt(total);
-  if ($("#installPriceBtn")) $("#installPriceBtn").textContent = fmt(total);
-}
-
-function ensureInstallScene(animate = true) {
-  const signature = installStateSignature();
-  if (installApi) {
-    if (installSig === signature) {
-      installApi.setStep(activeInstallKey, { animate });
-      return;
-    }
-    installApi.dispose();
-    installApi = null;
-  }
-  if (installLoading) return;
-  const stage = $("#installStage");
-  if (!stage) return;
-
-  installLoading = true;
-  import("./install3d.js")
-    .then(({ createInstallScene }) => {
-      if (!installApi) {
-        installApi = createInstallScene(stage, { ...state, trimStyles: { ...state.trimStyles } });
-        installSig = installStateSignature();
-      }
-      installApi.setStep(activeInstallKey, { animate: currentRoute() === "install" });
-    })
-    .catch((error) => {
-      console.warn("3D 安装演示加载失败", error);
-      stage.classList.add("is-fallback");
-      stage.textContent = "当前设备暂不支持 3D 演示";
-    })
-    .finally(() => {
-      installLoading = false;
-    });
-}
-
-function setInstallStep(key, animate = true) {
-  const steps = installSteps();
-  const info = steps.find((step) => step.key === key) || steps[0];
-  if (!info) return;
-  activeInstallKey = info.key;
-
-  $$("#installTabs button").forEach((button) => {
-    button.setAttribute("aria-selected", String(button.dataset.key === info.key));
-  });
-
-  if ($("#installTitle")) $("#installTitle").textContent = info.title;
-  if ($("#installDesc")) $("#installDesc").textContent = info.desc;
-  const copy = $("#installCopy");
-  if (copy) {
-    copy.classList.remove("is-swap");
-    void copy.offsetWidth;
-    copy.classList.add("is-swap");
-  }
-  $("#installStage")?.setAttribute("aria-label", `${info.name}，三维安装演示`);
-
-  ensureInstallScene(animate);
-}
-
-/* ---------- 收货信息 ---------- */
-function sumRow(label, value) {
-  return `<div class="sum-row"><span>${label}</span><b>${esc(value)}</b></div>`;
-}
-
-function summaryRowsFor(config = state, styleLabel = "") {
-  const style = STYLES.find((entry) => entry.id === config.styleId) || STYLES[0];
-  const start = startLabelFor(config.surfaceType, config.surfaceStart);
-  const curveLabel = config.surfaceType === "none"
-    ? "无侧面"
-    : config.surfaceType === "flat"
-      ? `不弯曲 · ${start}`
-      : `${config.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;
-  return [
-    ["款式", styleLabel || `${style.name} · ${style.tone}`],
-    ["下横", `${config.hoodWidth} × ${config.hoodDepth}mm`],
-    ["侧高", `靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`],
-    ["上竖", `${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`],
-    ["侧面", curveLabel],
-    ["装饰条", trimSummaryShort(config)],
-    ["垫高", `${config.shimHeight}mm`],
-  ];
-}
-
-function renderCheckoutSummary() {
-  const summary = $("#orderSummary");
-  const fees = $("#orderFees");
-  if (!summary && !fees) return;
-  const price = priceInfo();
-  if (summary) {
-    summary.innerHTML = summaryRowsFor(state).map(([label, value]) => sumRow(label, value)).join("");
-  }
-  if (fees) {
-    fees.innerHTML = [
-      sumRow("主体", fmt(CONFIG.basePrice)),
-      sumRow("装饰", fmt(price.trim)),
-      `<div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>`,
-    ].join("");
-  }
-}
-
-function renderCheckout() {
-  renderCheckoutSummary();
-  const price = priceInfo();
-  if ($("#checkoutPrice")) $("#checkoutPrice").textContent = fmt(price.total);
-  if ($("#checkoutOriginalPrice")) $("#checkoutOriginalPrice").textContent = fmt(listPrice(price.total));
-  const saved = readStored(STORAGE.customer, null);
-  if (saved) {
-    const fields = { coName: "name", coPhone: "phone", coRegion: "region", coAddress: "address" };
-    for (const [id, key] of Object.entries(fields)) {
-      const input = $(`#${id}`);
-      if (input && !input.value) input.value = saved[key] || "";
-    }
-  }
-  if ($("#formError")) $("#formError").textContent = "";
-  $$(".field").forEach((field) => field.classList.remove("is-invalid"));
-}
-
-function getCustomer() {
-  return {
-    name: $("#coName").value.trim(),
-    phone: $("#coPhone").value.trim(),
-    region: $("#coRegion").value.trim(),
-    address: $("#coAddress").value.trim(),
-    note: $("#coNote")?.value.trim() || "",
-  };
-}
-
-/* ---------- 订单查询 ---------- */
-let orderSearchToken = 0;
-let orderResultsCache = [];
-let activeOrder = null;
-let orderPreviewApi = null;
-let orderPreviewToken = 0;
-
-function normalizePhone(value) {
-  return String(value || "").replace(/\D/g, "").slice(0, 11);
-}
-
-function formatOrderDate(value) {
-  const date = new Date(value || "");
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`;
-}
-
-function orderStatus(order) {
-  if (order.submitted) return { text: "已提交", className: "is-ok" };
-  if (order.status === "awaiting_payment") return { text: "待支付", className: "is-wait" };
-  return { text: "处理中", className: "is-wait" };
-}
-
-function orderSpec(order) {
-  const config = order.config || {};
-  if (!config.hoodWidth) return "";
-  return `下横 ${config.hoodWidth}×${config.hoodDepth} · 上竖 ${config.chimneyWidth}×${config.chimneyDepth}×${config.chimneyHeight}`;
-}
-
-function orderResultHtml(order) {
-  const status = orderStatus(order);
-  const style = [order.style?.name, order.style?.tone].filter(Boolean).join(" · ");
-  const meta = [formatOrderDate(order.createdAt), style, fmt(order.price?.total ?? 0)].filter(Boolean).join(" · ");
-  const spec = orderSpec(order);
-  return `<article class="order-result" role="button" tabindex="0" data-order-id="${esc(order.id || "")}">
+    `).join("");}
+if(!steps.some((step)=>step.key===activeInstallKey))activeInstallKey=steps[0].key;return steps;}
+function installStateSignature(){return JSON.stringify({hoodWidth:state.hoodWidth,hoodDepth:state.hoodDepth,rearHeight:state.rearHeight,frontHeight:state.frontHeight,chimneyWidth:state.chimneyWidth,chimneyDepth:state.chimneyDepth,chimneyHeight:state.chimneyHeight,shimHeight:state.shimHeight,surfaceType:state.surfaceType,surfaceStart:state.surfaceStart,styleId:state.styleId,trimStyles:state.trimStyles,});}
+function updateInstallPrice(){const total=priceInfo().total;if($("#installPrice"))$("#installPrice").textContent=fmt(total);if($("#installPriceBtn"))$("#installPriceBtn").textContent=fmt(total);}
+function ensureInstallScene(animate=true){const signature=installStateSignature();if(installApi){if(installSig===signature){installApi.setStep(activeInstallKey,{animate});return;}
+installApi.dispose();installApi=null;}
+if(installLoading)return;const stage=$("#installStage");if(!stage)return;installLoading=true;import("./install3d.js?v=f4d2ea3684").then(({createInstallScene})=>{if(!installApi){installApi=createInstallScene(stage,{...state,trimStyles:{...state.trimStyles}});installSig=installStateSignature();}
+installApi.setStep(activeInstallKey,{animate:currentRoute()==="install"});}).catch((error)=>{console.warn("3D 安装演示加载失败",error);stage.classList.add("is-fallback");stage.textContent="当前设备暂不支持 3D 演示";}).finally(()=>{installLoading=false;});}
+function setInstallStep(key,animate=true){const steps=installSteps();const info=steps.find((step)=>step.key===key)||steps[0];if(!info)return;activeInstallKey=info.key;$$("#installTabs button").forEach((button)=>{button.setAttribute("aria-selected",String(button.dataset.key===info.key));});if($("#installTitle"))$("#installTitle").textContent=info.title;if($("#installDesc"))$("#installDesc").textContent=info.desc;const copy=$("#installCopy");if(copy){copy.classList.remove("is-swap");void copy.offsetWidth;copy.classList.add("is-swap");}
+$("#installStage")?.setAttribute("aria-label",`${info.name}，三维安装演示`);ensureInstallScene(animate);}
+function sumRow(label,value){return`<div class="sum-row"><span>${label}</span><b>${esc(value)}</b></div>`;}
+function summaryRowsFor(config=state,styleLabel=""){const style=STYLES.find((entry)=>entry.id===config.styleId)||STYLES[0];const start=startLabelFor(config.surfaceType,config.surfaceStart);const curveLabel=config.surfaceType==="none"?"无侧面":config.surfaceType==="flat"?`不弯曲 · ${start}`:`${config.surfaceType === "convex" ? "向外弯曲" : "向内弯曲"} · ${start}`;return[["款式",styleLabel||`${style.name} · ${style.tone}`],["下横",`${config.hoodWidth} × ${config.hoodDepth}mm`],["侧高",`靠墙 ${config.rearHeight} / 前侧 ${config.frontHeight}mm`],["上竖",`${config.chimneyWidth} × ${config.chimneyDepth} × ${config.chimneyHeight}mm`],["侧面",curveLabel],["装饰条",trimSummaryShort(config)],["垫高",`${config.shimHeight}mm`],];}
+function renderCheckoutSummary(){const summary=$("#orderSummary");const fees=$("#orderFees");if(!summary&&!fees)return;const price=priceInfo();if(summary){summary.innerHTML=summaryRowsFor(state).map(([label,value])=>sumRow(label,value)).join("");}
+if(fees){fees.innerHTML=[sumRow("主体",fmt(CONFIG.basePrice)),sumRow("装饰",fmt(price.trim)),`<div class="sum-row"><span>运费</span><b class="sum-ship"><s>¥30</s><em>¥0</em></b></div>`,].join("");}}
+function renderCheckout(){renderCheckoutSummary();const price=priceInfo();if($("#checkoutPrice"))$("#checkoutPrice").textContent=fmt(price.total);if($("#checkoutOriginalPrice"))$("#checkoutOriginalPrice").textContent=fmt(listPrice(price.total));const saved=readStored(STORAGE.customer,null);if(saved){const fields={coName:"name",coPhone:"phone",coRegion:"region",coAddress:"address"};for(const[id,key]of Object.entries(fields)){const input=$(`#${id}`);if(input&&!input.value)input.value=saved[key]||"";}}
+if($("#formError"))$("#formError").textContent="";$$(".field").forEach((field)=>field.classList.remove("is-invalid"));}
+function getCustomer(){return{name:$("#coName").value.trim(),phone:$("#coPhone").value.trim(),region:$("#coRegion").value.trim(),address:$("#coAddress").value.trim(),note:$("#coNote")?.value.trim()||"",};}
+let orderSearchToken=0;let orderResultsCache=[];let activeOrder=null;let orderPreviewApi=null;let orderPreviewToken=0;function normalizePhone(value){return String(value||"").replace(/\D/g,"").slice(0,11);}
+function formatOrderDate(value){const date=new Date(value||"");if(Number.isNaN(date.getTime()))return"";const pad=(number)=>String(number).padStart(2,"0");return`${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`;}
+function orderStatus(order){if(order.submitted)return{text:"已提交",className:"is-ok"};if(order.status==="awaiting_payment")return{text:"待支付",className:"is-wait"};return{text:"处理中",className:"is-wait"};}
+function orderSpec(order){const config=order.config||{};if(!config.hoodWidth)return"";return`下横 ${config.hoodWidth}×${config.hoodDepth} · 上竖 ${config.chimneyWidth}×${config.chimneyDepth}×${config.chimneyHeight}`;}
+function orderResultHtml(order){const status=orderStatus(order);const style=[order.style?.name,order.style?.tone].filter(Boolean).join(" · ");const meta=[formatOrderDate(order.createdAt),style,fmt(order.price?.total??0)].filter(Boolean).join(" · ");const spec=orderSpec(order);return`<article class="order-result" role="button" tabindex="0" data-order-id="${esc(order.id || "")}">
     <div class="order-result-head"><b>${esc(order.id || "—")}</b><span class="order-status ${status.className}">${status.text}</span></div>
     <div class="order-result-meta">${esc(meta)}</div>
     ${spec ? `<div class="order-result-spec">${esc(spec)}</div>` : ""}
-  </article>`;
-}
-
-function renderOrderResults(orders = [], message = "") {
-  orderResultsCache = orders;
-  $(".orders-page")?.classList.toggle("has-results", !message && orders.length > 0);
-  const root = $("#orderResults");
-  if (!root) return;
-  if (message) {
-    root.innerHTML = `<p class="orders-empty">${esc(message)}</p>`;
-    return;
-  }
-  if (!orders.length) {
-    root.innerHTML = '<p class="orders-empty">没有查到订单，换个手机号试试。</p>';
-    return;
-  }
-  root.innerHTML = orders.map(orderResultHtml).join("");
-}
-
-function openOrderDetail(order) {
-  if (!order) return;
-  activeOrder = order;
-  go("order");
-}
-
-async function fetchOrdersByPhone(phone) {
-  if (!CONFIG.orderEndpoint) return [];
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 4000);
-  try {
-    const url = new URL(CONFIG.orderEndpoint, location.href);
-    url.searchParams.set("phone", phone);
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) return [];
-    const data = await response.json();
-    if (!Array.isArray(data.orders)) return [];
-    return data.orders.filter((order) => {
-      const remotePhone = normalizePhone(order.customer?.phone);
-      return !remotePhone || remotePhone === phone;
-    });
-  } catch {
-    return [];
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
-
-async function searchOrders(value) {
-  const phone = normalizePhone(value);
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    renderOrderResults([], "请输入 11 位手机号");
-    return;
-  }
-
-  const token = ++orderSearchToken;
-  renderOrderResults([], "查询中…");
-
-  const local = readOrders().filter((order) => normalizePhone(order.customer?.phone) === phone);
-  const remote = await fetchOrdersByPhone(phone);
-  if (token !== orderSearchToken) return;
-
-  const byId = new Map();
-  remote.forEach((order) => {
-    if (order?.id) byId.set(order.id, order);
-  });
-  local.forEach((order) => {
-    if (order?.id) byId.set(order.id, { ...(byId.get(order.id) || {}), ...order });
-  });
-  const orders = Array.from(byId.values()).sort((a, b) => {
-    const timeA = new Date(a.createdAt || 0).getTime() || 0;
-    const timeB = new Date(b.createdAt || 0).getTime() || 0;
-    return timeB - timeA;
-  });
-  renderOrderResults(orders);
-}
-
-function resetOrderSearch() {
-  const phoneInput = $("#orderPhone");
-  if (phoneInput) phoneInput.value = "";
-  const results = $("#orderResults");
-  if (results) results.innerHTML = "";
-  orderSearchToken++;
-}
-
-function renderOrdersPage() {
-  // 手机号默认为空，让用户自己输入；不再从本地缓存回填。
-}
-
-function orderDetailNumber(value, fallback) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
-const ORDER_PANEL = 5;
-const ORDER_CLEARANCE = 5;
-
-function orderRectOutline(w, h) {
-  return [[0, 0], [w, 0], [w, h], [0, h]];
-}
-
-// 与 preview.js 完全一致的曲面过渡剖面：内凹 / 外凸 / 平斜。
-function orderTransitionProfile(t, surfaceType) {
-  if (surfaceType === "flat" || surfaceType === "none") return { spread: t, drop: t };
-  const inverse = 1 - t;
-  const concave = surfaceType === "concave";
-  const control1 = concave ? [0, 0.42] : [0.42, 0];
-  const control2 = concave ? [0.72, 1] : [1, 0.72];
-  return {
-    spread: 3 * inverse * inverse * t * control1[0] + 3 * inverse * t * t * control2[0] + t ** 3,
-    drop: 3 * inverse * inverse * t * control1[1] + 3 * inverse * t * t * control2[1] + t ** 3,
-  };
-}
-
-// 与 preview.js 的 notchProfile 保持一致，保证展开图豁口和 3D 模型同形。
-function orderNotchProfile(baseY, left, right, height, shape = "arch") {
-  const top = baseY + height;
-  if (shape === "rect") {
-    return [[right, baseY], [right, top], [left, top], [left, baseY]];
-  }
-  if (shape === "trapezoid") {
-    const inset = Math.min((right - left) * 0.2, height * 0.6);
-    return [[right, baseY], [right - inset, top], [left + inset, top], [left, baseY]];
-  }
-  if (shape === "rounded") {
-    const radius = Math.min(height * 0.45, (right - left) * 0.18);
-    const points = [[right, baseY]];
-    for (let index = 0; index <= 10; index++) {
-      const angle = (Math.PI / 2) * (index / 10);
-      points.push([right - radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
-    }
-    for (let index = 1; index <= 10; index++) {
-      const angle = Math.PI / 2 + (Math.PI / 2) * (index / 10);
-      points.push([left + radius + radius * Math.cos(angle), top - radius + radius * Math.sin(angle)]);
-    }
-    points.push([left, baseY]);
-    return points;
-  }
-  const cx = (left + right) / 2;
-  const half = (right - left) / 2;
-  const rise = Math.max(1, height);
-  const radius = (half * half + rise * rise) / (2 * rise);
-  const cy = baseY + rise - radius;
-  const startAngle = Math.atan2(baseY - cy, right - cx);
-  const endAngle = Math.atan2(baseY - cy, left - cx);
-  const points = [];
-  for (let index = 0; index <= 36; index++) {
-    const angle = startAngle + (endAngle - startAngle) * (index / 36);
-    points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
-  }
-  return points;
-}
-
-// 按 preview.js 的 buildModel 参数还原外罩实际外尺寸（含板厚和安装间隙）。
-function orderDrawingMetrics(config) {
-  const shim = clamp(orderDetailNumber(config.shimHeight, 0), 0, 60);
-  const hoodWidth = orderDetailNumber(config.hoodWidth, 800);
-  const hoodDepth = orderDetailNumber(config.hoodDepth, 450);
-  const rearHeightUser = orderDetailNumber(config.rearHeight, 380);
-  const frontHeightUser = orderDetailNumber(config.frontHeight, 240);
-  const chimneyWidthUser = orderDetailNumber(config.chimneyWidth, 320);
-  const chimneyDepthUser = orderDetailNumber(config.chimneyDepth, 280);
-  const chimneyHeightUser = orderDetailNumber(config.chimneyHeight, 500);
-  const width = hoodWidth + 2 * (ORDER_CLEARANCE + ORDER_PANEL);
-  const depth = hoodDepth + ORDER_PANEL;
-  const rearHeight = rearHeightUser + ORDER_PANEL + shim;
-  const frontHeight = frontHeightUser + ORDER_PANEL + shim;
-  const chimneyWidth = chimneyWidthUser + 2 * (ORDER_CLEARANCE + ORDER_PANEL);
-  const chimneyDepth = chimneyDepthUser + ORDER_PANEL;
-  const chimneyHeight = chimneyHeightUser - ORDER_PANEL;
-  const backZ = -depth;
-  const frontZ = 0;
-  const chimneyFrontZ = backZ + chimneyDepth;
-  const topFrontZ = frontZ - ORDER_PANEL;
-  const topDepth = topFrontZ - backZ;
-  const bottomFrontY = rearHeight - frontHeight;
-  const totalHeight = rearHeight + chimneyHeight;
-  const sideFrontZ = frontZ - ORDER_PANEL;
-  const sideTopY = rearHeight - ORDER_PANEL;
-  const sideBottomFrontY = bottomFrontY * (sideFrontZ - backZ) / depth;
-  const chimneyLeft = -chimneyWidth / 2;
-  const chimneyRight = chimneyWidth / 2;
-  const chimneyOpeningWidth = chimneyWidthUser + 2 * ORDER_CLEARANCE;
-  const chimneyOpeningDepth = chimneyDepthUser;
-  const surfaceType = config.surfaceType || "concave";
-  const surfaceStart = config.surfaceStart || "middle";
-  const startFraction = surfaceType === "convex"
-    ? (surfaceStart === "lowest" ? 0.28 : 0.4)
-    : (surfaceStart === "top" ? 1 : 0.5);
-  const startY = rearHeight + chimneyHeight * startFraction;
-  const notchEnabled = config.notchEnabled !== false;
-  const notchWidth = notchEnabled ? Math.min(orderDetailNumber(config.notchWidth, 420), width - 60) : 0;
-  const notchOffset = clamp(
-    orderDetailNumber(config.notchOffset, 0),
-    -(width - notchWidth) / 2 + 25,
-    (width - notchWidth) / 2 - 25
-  );
-  const notchHeight = notchEnabled ? Math.min(orderDetailNumber(config.notchHeight, 80), frontHeight - 24) : 0;
-  const notchLeft = notchOffset - notchWidth / 2;
-  const notchRight = notchOffset + notchWidth / 2;
-  return {
-    shim, hoodWidth, hoodDepth, rearHeightUser, frontHeightUser,
-    chimneyWidthUser, chimneyDepthUser, chimneyHeightUser,
-    width, depth, rearHeight, frontHeight, chimneyWidth, chimneyDepth, chimneyHeight,
-    backZ, frontZ, chimneyFrontZ, topFrontZ, topDepth, bottomFrontY, totalHeight,
-    sideFrontZ, sideTopY, sideBottomFrontY, chimneyLeft, chimneyRight,
-    chimneyOpeningWidth, chimneyOpeningDepth,
-    surfaceType, surfaceStart, startY,
-    notchEnabled, notchWidth, notchOffset, notchHeight, notchLeft, notchRight,
-    notchShape: config.notchShape || "arch",
-  };
-}
-
-// 可展直纹面等距展开：横坐标是展开弧长，纵坐标是每一条水平/纵深母线。
-// 这样曲面前片的上下宽度、展开高度、左右边界都与 3D 模型一致，只是整体等比缩小。
-function orderTransitionOutline(metrics, side) {
-  const samples = 64;
-  const fineCount = samples * 8 + 1;
-  const fineT = Array.from({ length: fineCount }, (_, index) => index / (fineCount - 1));
-  const rows = fineT.map((t) => {
-    const { spread, drop } = orderTransitionProfile(t, metrics.surfaceType);
-    const y = metrics.startY + drop * (metrics.rearHeight - metrics.startY);
-    if (side) {
-      return {
-        x: metrics.chimneyLeft + spread * (-metrics.width / 2 - metrics.chimneyLeft),
-        y,
-        d: metrics.chimneyDepth + spread * (metrics.depth - metrics.chimneyDepth),
-      };
-    }
-    return {
-      y,
-      z: metrics.chimneyFrontZ + spread * (metrics.frontZ - metrics.chimneyFrontZ),
-      x0: -metrics.chimneyWidth / 2 + spread * (-metrics.width / 2 + metrics.chimneyWidth / 2),
-      x1: metrics.chimneyWidth / 2 + spread * (metrics.width / 2 - metrics.chimneyWidth / 2),
-    };
-  });
-  const arc = [0];
-  for (let index = 1; index < fineCount; index++) {
-    const previous = rows[index - 1];
-    const current = rows[index];
-    const first = side ? current.x - previous.x : current.y - previous.y;
-    const second = side ? current.y - previous.y : current.z - previous.z;
-    arc.push(arc[index - 1] + Math.hypot(first, second));
-  }
-  const pick = (values, index) => values[Math.round(index * (fineCount - 1) / (samples - 1))];
-  const arcLength = arc[arc.length - 1];
-  const outline = [];
-  if (side) {
-    const depths = rows.map((row) => row.d);
-    for (let index = 0; index < samples; index++) outline.push([0, pick(arc, index)]);
-    outline.push([pick(depths, samples - 1), arcLength]);
-    for (let index = samples - 2; index >= 0; index--) outline.push([pick(depths, index), pick(arc, index)]);
-    return {
-      outline,
-      w: metrics.depth,
-      h: arcLength,
-      topWidth: metrics.chimneyDepth,
-      bottomWidth: metrics.depth,
-    };
-  }
-  const x0Values = rows.map((row) => row.x0);
-  const x1Values = rows.map((row) => row.x1);
-  const shift = metrics.width / 2;
-  for (let index = 0; index < samples; index++) outline.push([pick(x0Values, index) + shift, pick(arc, index)]);
-  outline.push([pick(x1Values, samples - 1) + shift, arcLength]);
-  for (let index = samples - 2; index >= 0; index--) outline.push([pick(x1Values, index) + shift, pick(arc, index)]);
-  return {
-    outline,
-    w: metrics.width,
-    h: arcLength,
-    topWidth: metrics.chimneyWidth,
-    bottomWidth: metrics.width,
-  };
-}
-
-function orderDrawingSvg(part, scale) {
-  const sw = Math.max(1, part.w * scale);
-  const sh = Math.max(1, part.h * scale);
-  const ox = (160 - sw) / 2;
-  const oy = (84 - sh) / 2;
-  const d = `${part.outline.map(([x, y], index) =>
-    `${index === 0 ? "M" : "L"}${(ox + x * scale).toFixed(2)} ${(oy + y * scale).toFixed(2)}`
-  ).join(" ")} Z`;
-  const centerLine = part.kind === "shim"
-    ? ""
-    : `<path d="M${(ox + sw / 2).toFixed(1)} ${(oy + 3).toFixed(1)} V${(oy + sh - 3).toFixed(1)}" stroke="#245c45" stroke-width=".6" stroke-dasharray="2 3" opacity=".22"/>`;
-  return `<svg viewBox="0 0 160 84" aria-hidden="true">
+  </article>`;}
+function renderOrderResults(orders=[],message=""){orderResultsCache=orders;$(".orders-page")?.classList.toggle("has-results",!message&&orders.length>0);const root=$("#orderResults");if(!root)return;if(message){root.innerHTML=`<p class="orders-empty">${esc(message)}</p>`;return;}
+if(!orders.length){root.innerHTML='<p class="orders-empty">没有查到订单，换个手机号试试。</p>';return;}
+root.innerHTML=orders.map(orderResultHtml).join("");}
+function openOrderDetail(order){if(!order)return;activeOrder=order;go("order");}
+async function fetchOrdersByPhone(phone){if(!CONFIG.orderLookupEndpoint)return[];const controller=new AbortController();const timer=window.setTimeout(()=>controller.abort(),4000);try{const url=new URL(CONFIG.orderLookupEndpoint,location.href);url.searchParams.set("phone",phone);const response=await fetch(url,{headers:{Accept:"application/json"},signal:controller.signal,});if(!response.ok)return[];const data=await response.json();if(!Array.isArray(data.orders))return[];return data.orders.filter((order)=>{const remotePhone=normalizePhone(order.customer?.phone);return!remotePhone||remotePhone===phone;});}catch{return[];}finally{window.clearTimeout(timer);}}
+async function searchOrders(value){const phone=normalizePhone(value);if(!/^1[3-9]\d{9}$/.test(phone)){renderOrderResults([],"请输入 11 位手机号");return;}
+const token=++orderSearchToken;renderOrderResults([],"查询中…");const local=readOrders().filter((order)=>normalizePhone(order.customer?.phone)===phone);const remote=await fetchOrdersByPhone(phone);if(token!==orderSearchToken)return;const byId=new Map();remote.forEach((order)=>{if(order?.id)byId.set(order.id,order);});local.forEach((order)=>{if(order?.id)byId.set(order.id,{...(byId.get(order.id)||{}),...order});});const orders=Array.from(byId.values()).sort((a,b)=>{const timeA=new Date(a.createdAt||0).getTime()||0;const timeB=new Date(b.createdAt||0).getTime()||0;return timeB-timeA;});renderOrderResults(orders);}
+function resetOrderSearch(){const phoneInput=$("#orderPhone");if(phoneInput)phoneInput.value="";const results=$("#orderResults");if(results)results.innerHTML="";orderSearchToken++;}
+function renderOrdersPage(){}
+function orderDetailNumber(value,fallback){const number=Number(value);return Number.isFinite(number)?number:fallback;}
+const ORDER_PANEL=5;const ORDER_CLEARANCE=5;function orderRectOutline(w,h){return[[0,0],[w,0],[w,h],[0,h]];}
+function orderTransitionProfile(t,surfaceType){if(surfaceType==="flat"||surfaceType==="none")return{spread:t,drop:t};const inverse=1-t;const concave=surfaceType==="concave";const control1=concave?[0,0.42]:[0.42,0];const control2=concave?[0.72,1]:[1,0.72];return{spread:3*inverse*inverse*t*control1[0]+3*inverse*t*t*control2[0]+t**3,drop:3*inverse*inverse*t*control1[1]+3*inverse*t*t*control2[1]+t**3,};}
+function orderNotchProfile(baseY,left,right,height,shape="arch"){const top=baseY+height;if(shape==="rect"){return[[right,baseY],[right,top],[left,top],[left,baseY]];}
+if(shape==="trapezoid"){const inset=Math.min((right-left)*0.2,height*0.6);return[[right,baseY],[right-inset,top],[left+inset,top],[left,baseY]];}
+if(shape==="rounded"){const radius=Math.min(height*0.45,(right-left)*0.18);const points=[[right,baseY]];for(let index=0;index<=10;index++){const angle=(Math.PI/2)*(index/10);points.push([right-radius+radius*Math.cos(angle),top-radius+radius*Math.sin(angle)]);}
+for(let index=1;index<=10;index++){const angle=Math.PI/2+(Math.PI/2)*(index/10);points.push([left+radius+radius*Math.cos(angle),top-radius+radius*Math.sin(angle)]);}
+points.push([left,baseY]);return points;}
+const cx=(left+right)/2;const half=(right-left)/2;const rise=Math.max(1,height);const radius=(half*half+rise*rise)/(2*rise);const cy=baseY+rise-radius;const startAngle=Math.atan2(baseY-cy,right-cx);const endAngle=Math.atan2(baseY-cy,left-cx);const points=[];for(let index=0;index<=36;index++){const angle=startAngle+(endAngle-startAngle)*(index/36);points.push([cx+radius*Math.cos(angle),cy+radius*Math.sin(angle)]);}
+return points;}
+function orderDrawingMetrics(config){const shim=clamp(orderDetailNumber(config.shimHeight,0),0,60);const hoodWidth=orderDetailNumber(config.hoodWidth,800);const hoodDepth=orderDetailNumber(config.hoodDepth,450);const rearHeightUser=orderDetailNumber(config.rearHeight,380);const frontHeightUser=orderDetailNumber(config.frontHeight,240);const chimneyWidthUser=orderDetailNumber(config.chimneyWidth,320);const chimneyDepthUser=orderDetailNumber(config.chimneyDepth,280);const chimneyHeightUser=orderDetailNumber(config.chimneyHeight,500);const width=hoodWidth+2*(ORDER_CLEARANCE+ORDER_PANEL);const depth=hoodDepth+ORDER_PANEL;const rearHeight=rearHeightUser+ORDER_PANEL+shim;const frontHeight=frontHeightUser+ORDER_PANEL+shim;const chimneyWidth=chimneyWidthUser+2*(ORDER_CLEARANCE+ORDER_PANEL);const chimneyDepth=chimneyDepthUser+ORDER_PANEL;const chimneyHeight=chimneyHeightUser-ORDER_PANEL;const backZ=-depth;const frontZ=0;const chimneyFrontZ=backZ+chimneyDepth;const topFrontZ=frontZ-ORDER_PANEL;const topDepth=topFrontZ-backZ;const bottomFrontY=rearHeight-frontHeight;const totalHeight=rearHeight+chimneyHeight;const sideFrontZ=frontZ-ORDER_PANEL;const sideTopY=rearHeight-ORDER_PANEL;const sideBottomFrontY=bottomFrontY*(sideFrontZ-backZ)/depth;const chimneyLeft=-chimneyWidth/2;const chimneyRight=chimneyWidth/2;const chimneyOpeningWidth=chimneyWidthUser+2*ORDER_CLEARANCE;const chimneyOpeningDepth=chimneyDepthUser;const surfaceType=config.surfaceType||"concave";const surfaceStart=config.surfaceStart||"middle";const startFraction=surfaceType==="convex"?(surfaceStart==="lowest"?0.28:0.4):(surfaceStart==="top"?1:0.5);const startY=rearHeight+chimneyHeight*startFraction;const notchEnabled=config.notchEnabled!==false;const notchWidth=notchEnabled?Math.min(orderDetailNumber(config.notchWidth,420),width-60):0;const notchOffset=clamp(orderDetailNumber(config.notchOffset,0),-(width-notchWidth)/2+25,(width-notchWidth)/2-25);const notchHeight=notchEnabled?Math.min(orderDetailNumber(config.notchHeight,80),frontHeight-24):0;const notchLeft=notchOffset-notchWidth/2;const notchRight=notchOffset+notchWidth/2;return{shim,hoodWidth,hoodDepth,rearHeightUser,frontHeightUser,chimneyWidthUser,chimneyDepthUser,chimneyHeightUser,width,depth,rearHeight,frontHeight,chimneyWidth,chimneyDepth,chimneyHeight,backZ,frontZ,chimneyFrontZ,topFrontZ,topDepth,bottomFrontY,totalHeight,sideFrontZ,sideTopY,sideBottomFrontY,chimneyLeft,chimneyRight,chimneyOpeningWidth,chimneyOpeningDepth,surfaceType,surfaceStart,startY,notchEnabled,notchWidth,notchOffset,notchHeight,notchLeft,notchRight,notchShape:config.notchShape||"arch",};}
+function orderTransitionOutline(metrics,side){const samples=64;const fineCount=samples*8+1;const fineT=Array.from({length:fineCount},(_,index)=>index/(fineCount-1));const rows=fineT.map((t)=>{const{spread,drop}=orderTransitionProfile(t,metrics.surfaceType);const y=metrics.startY+drop*(metrics.rearHeight-metrics.startY);if(side){return{x:metrics.chimneyLeft+spread*(-metrics.width/2-metrics.chimneyLeft),y,d:metrics.chimneyDepth+spread*(metrics.depth-metrics.chimneyDepth),};}
+return{y,z:metrics.chimneyFrontZ+spread*(metrics.frontZ-metrics.chimneyFrontZ),x0:-metrics.chimneyWidth/2+spread*(-metrics.width/2+metrics.chimneyWidth/2),x1:metrics.chimneyWidth/2+spread*(metrics.width/2-metrics.chimneyWidth/2),};});const arc=[0];for(let index=1;index<fineCount;index++){const previous=rows[index-1];const current=rows[index];const first=side?current.x-previous.x:current.y-previous.y;const second=side?current.y-previous.y:current.z-previous.z;arc.push(arc[index-1]+Math.hypot(first,second));}
+const pick=(values,index)=>values[Math.round(index*(fineCount-1)/(samples-1))];const arcLength=arc[arc.length-1];const outline=[];if(side){const depths=rows.map((row)=>row.d);for(let index=0;index<samples;index++)outline.push([0,pick(arc,index)]);outline.push([pick(depths,samples-1),arcLength]);for(let index=samples-2;index>=0;index--)outline.push([pick(depths,index),pick(arc,index)]);return{outline,w:metrics.depth,h:arcLength,topWidth:metrics.chimneyDepth,bottomWidth:metrics.depth,};}
+const x0Values=rows.map((row)=>row.x0);const x1Values=rows.map((row)=>row.x1);const shift=metrics.width/2;for(let index=0;index<samples;index++)outline.push([pick(x0Values,index)+shift,pick(arc,index)]);outline.push([pick(x1Values,samples-1)+shift,arcLength]);for(let index=samples-2;index>=0;index--)outline.push([pick(x1Values,index)+shift,pick(arc,index)]);return{outline,w:metrics.width,h:arcLength,topWidth:metrics.chimneyWidth,bottomWidth:metrics.width,};}
+function orderDrawingSvg(part,scale){const sw=Math.max(1,part.w*scale);const sh=Math.max(1,part.h*scale);const ox=(160-sw)/2;const oy=(84-sh)/2;const d=`${part.outline.map(([x, y], index) =>
+    `${index===0?"M":"L"}${(ox+x*scale).toFixed(2)}${(oy+y*scale).toFixed(2)}`
+  ).join(" ")} Z`;const centerLine=part.kind==="shim"?"":`<path d="M${(ox + sw / 2).toFixed(1)} ${(oy + 3).toFixed(1)} V${(oy + sh - 3).toFixed(1)}" stroke="#245c45" stroke-width=".6" stroke-dasharray="2 3" opacity=".22"/>`;return`<svg viewBox="0 0 160 84" aria-hidden="true">
     <path d="${d}" fill="rgba(36, 92, 69, 0.08)" stroke="#245c45" stroke-width="1.2" stroke-linejoin="round"/>
     ${centerLine}
-  </svg>`;
-}
-
-function orderTrimSvg(part) {
-  return `<svg viewBox="0 0 160 84" aria-hidden="true">
+  </svg>`;}
+function orderTrimSvg(part){return`<svg viewBox="0 0 160 84" aria-hidden="true">
     <g transform="translate(32 6) scale(1.5)">${trimArtMarkup(part.styleId || "single")}</g>
-  </svg>`;
-}
-
-function orderDrawingTile(part, scale = 1) {
-  const art = part.kind === "trim" ? orderTrimSvg(part) : orderDrawingSvg(part, scale);
-  return `<article class="drawing-tile">
+  </svg>`;}
+function orderDrawingTile(part,scale=1){const art=part.kind==="trim"?orderTrimSvg(part):orderDrawingSvg(part,scale);return`<article class="drawing-tile">
     <div class="drawing-art">${art}</div>
     <b>${esc(part.name)}</b>
     <span>${esc(part.size)}</span>
     ${part.note ? `<em>${esc(part.note)}</em>` : ""}
-  </article>`;
-}
-
-function orderDrawingSort(parts) {
-  return parts.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h) || b.w - a.w);
-}
-
-function orderTrimParts(config, metrics) {
-  const styles = config.trimStyles || {};
-  return TRIM_POSITIONS.flatMap((position) => {
-    const styleId = styles[position.key] || "none";
-    const trim = TRIMS.find((item) => item.id === styleId);
-    if (!trim || trim.id === "none") return [];
-    if (position.key === "start" && (metrics.surfaceType === "none" || metrics.surfaceStart === "top")) return [];
-    const isHood = position.key === "hoodTop" || position.key === "hoodBottom";
-    const front = isHood ? metrics.width : metrics.chimneyWidth;
-    const side = isHood ? metrics.depth : metrics.chimneyDepth;
-    const bottomSide = position.key === "hoodBottom"
-      ? Math.hypot(metrics.bottomFrontY, metrics.depth)
-      : side;
-    let count = 3;
-    let size = `3 根 · 正面 ${Math.round(front)} / 侧 ${Math.round(side)}mm`;
-    if (position.key === "hoodBottom" && metrics.notchEnabled) {
-      count = 5;
-      size = `5 根 · 两侧 ${Math.round(bottomSide)} + 正面分 3 段`;
-    }
-    return [{
-      name: `${position.name}装饰条`,
-      w: front,
-      h: 1,
-      kind: "trim",
-      styleId: trim.id,
-      count,
-      size,
-      note: trim.name,
-    }];
-  });
-}
-
-function orderGroupScale(parts) {
-  const items = parts.filter((part) => Array.isArray(part.outline));
-  if (!items.length) return 1;
-  const maxW = Math.max(...items.map((part) => Math.max(1, part.w)));
-  const maxH = Math.max(...items.map((part) => Math.max(1, part.h)));
-  return Math.min((160 - 28) / maxW, (84 - 12) / maxH);
-}
-
-function buildOrderDrawingGroups(config) {
-  const metrics = orderDrawingMetrics(config);
-  const {
-    width, rearHeight, frontHeight, chimneyWidth, chimneyDepth, chimneyHeight,
-    backZ, topFrontZ, topDepth, bottomFrontY, sideFrontZ, sideTopY, sideBottomFrontY,
-    chimneyOpeningWidth, chimneyOpeningDepth, notchEnabled, notchWidth, notchHeight,
-  } = metrics;
-
-  const notchContour = notchEnabled
-    ? orderNotchProfile(bottomFrontY, metrics.notchLeft, metrics.notchRight, notchHeight, metrics.notchShape)
-    : [];
-  const frontOutline = [
-    [-width / 2, bottomFrontY],
-    [-width / 2, rearHeight],
-    [width / 2, rearHeight],
-    [width / 2, bottomFrontY],
-    ...notchContour,
-  ].map(([x, y]) => [x + width / 2, rearHeight - y]);
-
-  const sideOutline = [
-    [backZ, 0],
-    [backZ, sideTopY],
-    [sideFrontZ, sideTopY],
-    [sideFrontZ, sideBottomFrontY],
-  ].map(([z, y]) => [z - backZ, sideTopY - y]);
-
-  const topOutline = [
-    [-width / 2, backZ],
-    [-chimneyOpeningWidth / 2, backZ],
-    [-chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
-    [chimneyOpeningWidth / 2, backZ + chimneyOpeningDepth],
-    [chimneyOpeningWidth / 2, backZ],
-    [width / 2, backZ],
-    [width / 2, topFrontZ],
-    [-width / 2, topFrontZ],
-  ].map(([x, z]) => [x + width / 2, z - backZ]);
-
-  const lower = [
-    {
-      name: "下横顶板", w: width, h: topDepth, kind: "top", outline: topOutline,
-      size: `${Math.round(width)} × ${Math.round(topDepth)}mm`,
-      note: `后缘烟道口 ${Math.round(chimneyOpeningWidth)} × ${Math.round(chimneyOpeningDepth)}mm`,
-    },
-    {
-      name: "下横前挡板", w: width, h: frontHeight, kind: "front", outline: frontOutline,
-      size: `${Math.round(width)} × ${Math.round(frontHeight)}mm`,
-      note: notchEnabled
-        ? `开口 ${Math.round(notchWidth)} × ${Math.round(notchHeight)}mm · 板厚 5mm`
-        : "板厚 5mm",
-    },
-    {
-      name: "下横左侧板", w: topDepth, h: sideTopY, kind: "side", outline: sideOutline,
-      size: `${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,
-      note: `前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,
-    },
-    {
-      name: "下横右侧板", w: topDepth, h: sideTopY, kind: "side", outline: sideOutline,
-      size: `${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,
-      note: `前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,
-    },
-  ];
-
-  const upperSideWidth = chimneyDepth - ORDER_PANEL;
-  const upper = [
-    {
-      name: "上竖前挡板", w: chimneyWidth, h: chimneyHeight, kind: "rect",
-      outline: orderRectOutline(chimneyWidth, chimneyHeight),
-      size: `${Math.round(chimneyWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
-    },
-    {
-      name: "上竖左侧板", w: upperSideWidth, h: chimneyHeight, kind: "rect",
-      outline: orderRectOutline(upperSideWidth, chimneyHeight),
-      size: `${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
-    },
-    {
-      name: "上竖右侧板", w: upperSideWidth, h: chimneyHeight, kind: "rect",
-      outline: orderRectOutline(upperSideWidth, chimneyHeight),
-      size: `${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`, note: "板厚 5mm",
-    },
-  ];
-
-  let transition = [];
-  if (metrics.surfaceType !== "none") {
-    const front = orderTransitionOutline(metrics, false);
-    const side = orderTransitionOutline(metrics, true);
-    const prefix = metrics.surfaceType === "flat" ? "过渡" : "曲面";
-    transition = [
-      {
-        name: `${prefix}前片`, w: front.w, h: front.h, kind: "curve", outline: front.outline,
-        size: `展开 ${Math.round(front.w)} × ${Math.round(front.h)}mm`,
-        note: `上宽 ${Math.round(front.topWidth)} / 下宽 ${Math.round(front.bottomWidth)} · 3D 展开`,
-      },
-      {
-        name: `${prefix}左片`, w: side.w, h: side.h, kind: "curve", outline: side.outline,
-        size: `展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,
-        note: `上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,
-      },
-      {
-        name: `${prefix}右片`, w: side.w, h: side.h, kind: "curve", outline: side.outline,
-        size: `展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,
-        note: `上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,
-      },
-    ];
-  }
-
-  const shims = metrics.shim > 0
-    ? [
-        {
-          name: "左垫板", w: topDepth, h: metrics.shim, kind: "shim",
-          outline: orderRectOutline(topDepth, metrics.shim),
-          size: `${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,
-          note: "左右各一 · 5mm 板",
-        },
-        {
-          name: "右垫板", w: topDepth, h: metrics.shim, kind: "shim",
-          outline: orderRectOutline(topDepth, metrics.shim),
-          size: `${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,
-          note: "左右各一 · 5mm 板",
-        },
-      ]
-    : [];
-
-  const groups = [
-    { id: "lower", title: "下横", parts: orderDrawingSort(lower) },
-    { id: "upper", title: "上竖", parts: orderDrawingSort(upper) },
-  ];
-  if (transition.length) {
-    groups.push({
-      id: "curve",
-      title: metrics.surfaceType === "flat" ? "过渡面" : "曲面",
-      parts: orderDrawingSort(transition),
-    });
-  }
-  if (shims.length) {
-    groups.push({ id: "shim", title: "垫高", parts: orderDrawingSort(shims) });
-  }
-  const trims = orderTrimParts(config, metrics);
-  if (trims.length) {
-    const total = trims.reduce((sum, part) => sum + part.count, 0);
-    groups.push({
-      id: "trim",
-      title: "装饰条",
-      parts: trims,
-      summary: `共 ${total} 根 · ${trims.length} 个位置`,
-    });
-  }
-  // 所有平板/曲面部件共用一个缩放比例，跨 Tab 也能直接比较大小；装饰条是截面示意。
-  const panelParts = groups.flatMap((group) => group.parts).filter((part) => Array.isArray(part.outline));
-  const globalScale = orderGroupScale(panelParts);
-  groups.forEach((group) => {
-    group.scale = group.id === "trim" ? 1 : globalScale;
-  });
-  return groups;
-}
-
-function disposeOrderPreview() {
-  orderPreviewToken++;
-  orderPreviewApi?.dispose();
-  orderPreviewApi = null;
-}
-
-async function mountOrderPreview(config) {
-  const stage = $("#orderModelStage");
-  if (!stage) return;
-  const token = ++orderPreviewToken;
-  try {
-    const module = await import(PREVIEW_MODULE_URL);
-    if (token !== orderPreviewToken || !stage.isConnected || currentRoute() !== "order") return;
-    stage.innerHTML = "";
-    orderPreviewApi = module.createPreview(stage, config, {
-      aspectFit: true,
-      fitMargin: 1.35,
-      softLighting: true,
-    });
-  } catch (error) {
-    console.warn("订单 3D 模型加载失败", error);
-    stage.classList.add("is-fallback");
-    stage.textContent = "3D 模型加载失败";
-  }
-}
-
-function renderOrderDetail() {
-  const root = $("#orderDetail");
-  if (!root) return;
-  if (!activeOrder) {
-    go("orders", { replace: true });
-    return;
-  }
-  const order = activeOrder;
-  const orderConfig = orderInstallConfig(order);
-  const status = orderStatus(order);
-  const styleEntry = STYLES.find((entry) => entry.id === orderConfig.styleId) || STYLES[0];
-  const styleLabel = [
-    order.style?.name || styleEntry.name,
-    order.style?.tone || styleEntry.tone,
-  ].filter(Boolean).join(" · ");
-  const customer = order.customer || {};
-  const shippingRows = [
-    ["收货人", customer.name || "—"],
-    ["手机号", customer.phone || "—"],
-    ["所在地区", customer.region || "—"],
-    ["详细地址", customer.address || "—"],
-  ];
-  const infoRows = [
-    ["订单编号", order.id || "—"],
-    ["下单时间", formatOrderDate(order.createdAt)],
-    ...summaryRowsFor(orderConfig, styleLabel),
-  ];
-  const computedPrice = priceInfoFor(orderConfig);
-  const storedPrice = order.price || {};
-  const storedBase = storedPrice.base == null ? NaN : Number(storedPrice.base);
-  const storedTrim = storedPrice.trim == null ? NaN : Number(storedPrice.trim);
-  const storedTotal = storedPrice.total == null ? NaN : Number(storedPrice.total);
-  const hasBreakdown = Number.isFinite(storedBase) && Number.isFinite(storedTrim);
-  const base = hasBreakdown ? storedBase : computedPrice.base;
-  const trim = hasBreakdown ? storedTrim : computedPrice.trim;
-  const total = Number.isFinite(storedTotal)
-    ? storedTotal
-    : hasBreakdown ? storedBase + storedTrim : computedPrice.total;
-
-  disposeOrderPreview();
-  root.innerHTML = `
+  </article>`;}
+function orderDrawingSort(parts){return parts.slice().sort((a,b)=>(b.w*b.h)-(a.w*a.h)||b.w-a.w);}
+function orderTrimParts(config,metrics){const styles=config.trimStyles||{};return TRIM_POSITIONS.flatMap((position)=>{const styleId=styles[position.key]||"none";const trim=TRIMS.find((item)=>item.id===styleId);if(!trim||trim.id==="none")return[];if(position.key==="start"&&(metrics.surfaceType==="none"||metrics.surfaceStart==="top"))return[];const isHood=position.key==="hoodTop"||position.key==="hoodBottom";const front=isHood?metrics.width:metrics.chimneyWidth;const side=isHood?metrics.depth:metrics.chimneyDepth;const bottomSide=position.key==="hoodBottom"?Math.hypot(metrics.bottomFrontY,metrics.depth):side;let count=3;let size=`3 根 · 正面 ${Math.round(front)} / 侧 ${Math.round(side)}mm`;if(position.key==="hoodBottom"&&metrics.notchEnabled){count=5;size=`5 根 · 两侧 ${Math.round(bottomSide)} + 正面分 3 段`;}
+return[{name:`${position.name}装饰条`,w:front,h:1,kind:"trim",styleId:trim.id,count,size,note:trim.name,}];});}
+function orderGroupScale(parts){const items=parts.filter((part)=>Array.isArray(part.outline));if(!items.length)return 1;const maxW=Math.max(...items.map((part)=>Math.max(1,part.w)));const maxH=Math.max(...items.map((part)=>Math.max(1,part.h)));return Math.min((160-28)/maxW,(84-12)/maxH);}
+function buildOrderDrawingGroups(config){const metrics=orderDrawingMetrics(config);const{width,rearHeight,frontHeight,chimneyWidth,chimneyDepth,chimneyHeight,backZ,topFrontZ,topDepth,bottomFrontY,sideFrontZ,sideTopY,sideBottomFrontY,chimneyOpeningWidth,chimneyOpeningDepth,notchEnabled,notchWidth,notchHeight,}=metrics;const notchContour=notchEnabled?orderNotchProfile(bottomFrontY,metrics.notchLeft,metrics.notchRight,notchHeight,metrics.notchShape):[];const frontOutline=[[-width/2,bottomFrontY],[-width/2,rearHeight],[width/2,rearHeight],[width/2,bottomFrontY],...notchContour,].map(([x,y])=>[x+width/2,rearHeight-y]);const sideOutline=[[backZ,0],[backZ,sideTopY],[sideFrontZ,sideTopY],[sideFrontZ,sideBottomFrontY],].map(([z,y])=>[z-backZ,sideTopY-y]);const topOutline=[[-width/2,backZ],[-chimneyOpeningWidth/2,backZ],[-chimneyOpeningWidth/2,backZ+chimneyOpeningDepth],[chimneyOpeningWidth/2,backZ+chimneyOpeningDepth],[chimneyOpeningWidth/2,backZ],[width/2,backZ],[width/2,topFrontZ],[-width/2,topFrontZ],].map(([x,z])=>[x+width/2,z-backZ]);const lower=[{name:"下横顶板",w:width,h:topDepth,kind:"top",outline:topOutline,size:`${Math.round(width)} × ${Math.round(topDepth)}mm`,note:`后缘烟道口 ${Math.round(chimneyOpeningWidth)} × ${Math.round(chimneyOpeningDepth)}mm`,},{name:"下横前挡板",w:width,h:frontHeight,kind:"front",outline:frontOutline,size:`${Math.round(width)} × ${Math.round(frontHeight)}mm`,note:notchEnabled?`开口 ${Math.round(notchWidth)} × ${Math.round(notchHeight)}mm · 板厚 5mm`:"板厚 5mm",},{name:"下横左侧板",w:topDepth,h:sideTopY,kind:"side",outline:sideOutline,size:`${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,note:`前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,},{name:"下横右侧板",w:topDepth,h:sideTopY,kind:"side",outline:sideOutline,size:`${Math.round(topDepth)} × ${Math.round(sideTopY)}mm`,note:`前侧高 ${Math.round(sideTopY - sideBottomFrontY)}mm · 板厚 5mm`,},];const upperSideWidth=chimneyDepth-ORDER_PANEL;const upper=[{name:"上竖前挡板",w:chimneyWidth,h:chimneyHeight,kind:"rect",outline:orderRectOutline(chimneyWidth,chimneyHeight),size:`${Math.round(chimneyWidth)} × ${Math.round(chimneyHeight)}mm`,note:"板厚 5mm",},{name:"上竖左侧板",w:upperSideWidth,h:chimneyHeight,kind:"rect",outline:orderRectOutline(upperSideWidth,chimneyHeight),size:`${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`,note:"板厚 5mm",},{name:"上竖右侧板",w:upperSideWidth,h:chimneyHeight,kind:"rect",outline:orderRectOutline(upperSideWidth,chimneyHeight),size:`${Math.round(upperSideWidth)} × ${Math.round(chimneyHeight)}mm`,note:"板厚 5mm",},];let transition=[];if(metrics.surfaceType!=="none"){const front=orderTransitionOutline(metrics,false);const side=orderTransitionOutline(metrics,true);const prefix=metrics.surfaceType==="flat"?"过渡":"曲面";transition=[{name:`${prefix}前片`,w:front.w,h:front.h,kind:"curve",outline:front.outline,size:`展开 ${Math.round(front.w)} × ${Math.round(front.h)}mm`,note:`上宽 ${Math.round(front.topWidth)} / 下宽 ${Math.round(front.bottomWidth)} · 3D 展开`,},{name:`${prefix}左片`,w:side.w,h:side.h,kind:"curve",outline:side.outline,size:`展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,note:`上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,},{name:`${prefix}右片`,w:side.w,h:side.h,kind:"curve",outline:side.outline,size:`展开 ${Math.round(side.w)} × ${Math.round(side.h)}mm`,note:`上深 ${Math.round(side.topWidth)} / 下深 ${Math.round(side.bottomWidth)} · 3D 展开`,},];}
+const shims=metrics.shim>0?[{name:"左垫板",w:topDepth,h:metrics.shim,kind:"shim",outline:orderRectOutline(topDepth,metrics.shim),size:`${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,note:"左右各一 · 5mm 板",},{name:"右垫板",w:topDepth,h:metrics.shim,kind:"shim",outline:orderRectOutline(topDepth,metrics.shim),size:`${Math.round(topDepth)} × ${Math.round(metrics.shim)}mm`,note:"左右各一 · 5mm 板",},]:[];const groups=[{id:"lower",title:"下横",parts:orderDrawingSort(lower)},{id:"upper",title:"上竖",parts:orderDrawingSort(upper)},];if(transition.length){groups.push({id:"curve",title:metrics.surfaceType==="flat"?"过渡面":"曲面",parts:orderDrawingSort(transition),});}
+if(shims.length){groups.push({id:"shim",title:"垫高",parts:orderDrawingSort(shims)});}
+const trims=orderTrimParts(config,metrics);if(trims.length){const total=trims.reduce((sum,part)=>sum+part.count,0);groups.push({id:"trim",title:"装饰条",parts:trims,summary:`共 ${total} 根 · ${trims.length} 个位置`,});}
+const panelParts=groups.flatMap((group)=>group.parts).filter((part)=>Array.isArray(part.outline));const globalScale=orderGroupScale(panelParts);groups.forEach((group)=>{group.scale=group.id==="trim"?1:globalScale;});return groups;}
+function disposeOrderPreview(){orderPreviewToken++;orderPreviewApi?.dispose();orderPreviewApi=null;}
+async function mountOrderPreview(config){const stage=$("#orderModelStage");if(!stage)return;const token=++orderPreviewToken;try{const module=await import(PREVIEW_MODULE_URL);if(token!==orderPreviewToken||!stage.isConnected||currentRoute()!=="order")return;stage.innerHTML="";orderPreviewApi=module.createPreview(stage,config,{aspectFit:true,fitMargin:1.35,softLighting:true,});}catch(error){console.warn("订单 3D 模型加载失败",error);stage.classList.add("is-fallback");stage.textContent="3D 模型加载失败";}}
+function renderOrderDetail(){const root=$("#orderDetail");if(!root)return;if(!activeOrder){go("orders",{replace:true});return;}
+const order=activeOrder;const orderConfig=orderInstallConfig(order);const status=orderStatus(order);const styleEntry=STYLES.find((entry)=>entry.id===orderConfig.styleId)||STYLES[0];const styleLabel=[order.style?.name||styleEntry.name,order.style?.tone||styleEntry.tone,].filter(Boolean).join(" · ");const customer=order.customer||{};const shippingRows=[["收货人",customer.name||"—"],["手机号",customer.phone||"—"],["所在地区",customer.region||"—"],["详细地址",customer.address||"—"],];const infoRows=[["订单编号",order.id||"—"],["下单时间",formatOrderDate(order.createdAt)],...summaryRowsFor(orderConfig,styleLabel),];const computedPrice=priceInfoFor(orderConfig);const storedPrice=order.price||{};const storedBase=storedPrice.base==null?NaN:Number(storedPrice.base);const storedTrim=storedPrice.trim==null?NaN:Number(storedPrice.trim);const storedTotal=storedPrice.total==null?NaN:Number(storedPrice.total);const hasBreakdown=Number.isFinite(storedBase)&&Number.isFinite(storedTrim);const base=hasBreakdown?storedBase:computedPrice.base;const trim=hasBreakdown?storedTrim:computedPrice.trim;const total=Number.isFinite(storedTotal)?storedTotal:hasBreakdown?storedBase+storedTrim:computedPrice.total;disposeOrderPreview();root.innerHTML=`
     <section class="order-model-hero" aria-label="订单 3D 模型">
       <div class="order-model-stage" id="orderModelStage"></div>
     </section>
@@ -2458,210 +314,49 @@ function renderOrderDetail() {
     <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
     <section class="order-detail-service">
       <p class="order-detail-service-title">有问题？加客服微信</p>
-      ${(CONFIG.serviceQrImage || CONFIG.qrImage) ? `<img class="order-detail-qr" src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}" alt="客服微信二维码" />` : ""}
+      ${(CONFIG.serviceQrImage || CONFIG.qrImage) ? `<img class="order-detail-qr"src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}"alt="客服微信二维码"/>` : ""}
       <p class="order-detail-wechat">微信号 <b>${esc(CONFIG.wechatId)}</b></p>
     </section>
-  `;
-
-  mountOrderPreview(orderConfig);
-}
-
-function openOrderDrawing() {
-  if (!activeOrder) return;
-  const groups = buildOrderDrawingGroups(orderInstallConfig(activeOrder));
-  if (!groups.length) return;
-
-  openSheet({
-    title: "展开图纸",
-    backdrop: "light",
-    sheetClass: "sheet--drawing",
-    body: `
+  `;mountOrderPreview(orderConfig);}
+function openOrderDrawing(){if(!activeOrder)return;const groups=buildOrderDrawingGroups(orderInstallConfig(activeOrder));if(!groups.length)return;openSheet({title:"展开图纸",backdrop:"light",sheetClass:"sheet--drawing",body:`
       <div class="order-drawing-sheet">
         <nav class="drawing-tabs" id="drawingTabs" role="tablist" aria-label="部件图纸">
-          ${groups.map((group, index) => `<button type="button" role="tab" data-drawing-tab="${group.id}" aria-selected="${index === 0}">${esc(group.title)}</button>`).join("")}
+          ${groups.map((group, index) => `<button type="button"role="tab"data-drawing-tab="${group.id}"aria-selected="${index === 0}">${esc(group.title)}</button>`).join("")}
         </nav>
         <div class="drawing-panel" id="drawingPanel" role="tabpanel"></div>
       </div>
-    `,
-    actions: [{ label: "关闭", kind: "text", onClick: closeSheet }],
-  });
-
-  const nav = $("#drawingTabs");
-  const panel = $("#drawingPanel");
-  if (!nav || !panel) return;
-
-  const apply = (id) => {
-    const group = groups.find((item) => item.id === id) || groups[0];
-    nav.querySelectorAll("button").forEach((button) => {
-      button.setAttribute("aria-selected", String(button.dataset.drawingTab === group.id));
-    });
-    const note = group.id === "trim"
-      ? "装饰条图标为实际截面示意，长度和根数见尺寸标注；精确下料以工厂图纸为准。"
-      : "所有平板和曲面部件共用同一个比例，按 3D 外罩实际尺寸绘制（含 5mm 板厚与安装间隙）；曲面部件的展开高度为曲面弧长。精确下料以工厂图纸为准。";
-    panel.innerHTML = `
+    `,actions:[{label:"关闭",kind:"text",onClick:closeSheet}],});const nav=$("#drawingTabs");const panel=$("#drawingPanel");if(!nav||!panel)return;const apply=(id)=>{const group=groups.find((item)=>item.id===id)||groups[0];nav.querySelectorAll("button").forEach((button)=>{button.setAttribute("aria-selected",String(button.dataset.drawingTab===group.id));});const note=group.id==="trim"?"装饰条图标为实际截面示意，长度和根数见尺寸标注；精确下料以工厂图纸为准。":"所有平板和曲面部件共用同一个比例，按 3D 外罩实际尺寸绘制（含 5mm 板厚与安装间隙）；曲面部件的展开高度为曲面弧长。精确下料以工厂图纸为准。";panel.innerHTML=`
       <div class="drawing-meta">
-        <span>${esc(group.summary || `共 ${group.parts.length} 件`)}${group.id === "trim" ? "" : " · 全图等比"}</span>
+        <span>${esc(group.summary || `共 ${group.parts.length}件`)}${group.id === "trim" ? "" : " · 全图等比"}</span>
         <span>实际下料 · mm</span>
       </div>
       <div class="drawing-row">${group.parts.map((part) => orderDrawingTile(part, group.scale)).join("")}</div>
       <p class="drawing-note">${esc(note)}</p>
-    `;
-  };
-
-  nav.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-drawing-tab]");
-    if (button) apply(button.dataset.drawingTab);
-  });
-  apply(groups[0].id);
-}
-
-function openServiceSheet() {
-  openSheet({
-    title: "联系客服",
-    backdrop: "light",
-    body: `
+    `;};nav.addEventListener("click",(event)=>{const button=event.target.closest("[data-drawing-tab]");if(button)apply(button.dataset.drawingTab);});apply(groups[0].id);}
+function openServiceSheet(){openSheet({title:"联系客服",backdrop:"light",body:`
       <div class="service-qr"><img src="${esc(CONFIG.serviceQrImage || CONFIG.qrImage)}" alt="客服微信二维码" /></div>
       <p class="service-wechat">微信号 <b>${esc(CONFIG.wechatId)}</b></p>
       <p class="sheet-note">扫码添加，发送订单号。</p>
-    `,
-    actions: [
-      { label: "复制微信号", kind: "primary", onClick: () => copyText(CONFIG.wechatId) },
-      { label: "关闭", kind: "text", onClick: closeSheet },
-    ],
-  });
-}
-
-function orderInstallConfig(order) {
-  const config = order?.config || {};
-  // 旧订单只有单一 trimStyle，四个位置都按它还原；新订单直接用 trimStyles。
-  const legacyTrim = config.trimStyle;
-  const fallbackTrims = legacyTrim
-    ? { top: legacyTrim, start: legacyTrim, hoodTop: legacyTrim, hoodBottom: legacyTrim }
-    : DEFAULTS.trimStyles;
-  return {
-    ...DEFAULTS,
-    ...config,
-    trimStyles: { ...fallbackTrims, ...(config.trimStyles || {}) },
-  };
-}
-
-function validateCustomer(customer) {
-  const problems = [];
-  const mark = (selector) => $(selector)?.closest(".field")?.classList.add("is-invalid");
-  $$(".field").forEach((field) => field.classList.remove("is-invalid"));
-  if (customer.name.length < 2) { mark("#coName"); problems.push("请填写收货人姓名"); }
-  if (!/^1[3-9]\d{9}$/.test(customer.phone)) { mark("#coPhone"); problems.push("请填写 11 位手机号"); }
-  if (!customer.region) { mark("#coRegion"); problems.push("请填写所在地区"); }
-  if (customer.address.length < 5) { mark("#coAddress"); problems.push("请填写详细地址"); }
-  return problems;
-}
-
-function makeOrderId() {
-  const now = new Date();
-  const date = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return `YYJ${date}-${Math.floor(10000 + Math.random() * 90000)}`;
-}
-
-function createOrder(customer) {
-  const style = currentStyle();
-  const price = priceInfo();
-  return {
-    id: makeOrderId(),
-    createdAt: new Date().toISOString(),
-    status: "awaiting_payment",
-    source: "h5",
-    style: { id: style.id, name: style.name, tone: style.tone },
-    config: { ...state, trimStyles: { ...state.trimStyles } },
-    price: { base: price.base, trim: price.trim, total: price.total, trimDetails: price.details },
-    customer: { ...customer },
-  };
-}
-
-function readOrders() {
-  const orders = readStored(STORAGE.orders, []);
-  return Array.isArray(orders) ? orders : [];
-}
-function saveLocalOrder(order) {
-  const orders = readOrders();
-  const index = orders.findIndex((item) => item.id === order.id);
-  if (index >= 0) orders[index] = order;
-  else orders.unshift(order);
-  writeStored(STORAGE.orders, orders.slice(0, 80));
-}
-function readQueue() {
-  const queue = readStored(STORAGE.pending, []);
-  return Array.isArray(queue) ? queue : [];
-}
-function queueOrder(order) {
-  const queue = readQueue().filter((item) => item.id !== order.id);
-  queue.unshift(order);
-  writeStored(STORAGE.pending, queue.slice(0, 20));
-}
-function removeQueued(id) {
-  writeStored(STORAGE.pending, readQueue().filter((item) => item.id !== id));
-}
-function markLocalSynced(id) {
-  const orders = readOrders();
-  const index = orders.findIndex((item) => item.id === id);
-  if (index >= 0) {
-    orders[index].synced = true;
-    writeStored(STORAGE.orders, orders);
-  }
-}
-
-async function postOrder(order) {
-  if (!CONFIG.orderEndpoint) return false;
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 4200);
-  try {
-    const response = await fetch(CONFIG.orderEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(order),
-      signal: controller.signal,
-      keepalive: true,
-    });
-    return response.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function submitOrder(order) {
-  order.submittedAt = new Date().toISOString();
-  saveLocalOrder(order);
-  const sent = await postOrder(order);
-  order.synced = sent;
-  if (sent) {
-    removeQueued(order.id);
-    markLocalSynced(order.id);
-  } else {
-    queueOrder(order);
-  }
-  saveLocalOrder(order);
-  writeStored(STORAGE.lastOrder, order);
-  return order;
-}
-
-async function flushPending() {
-  if (!CONFIG.orderEndpoint) return;
-  const queue = readQueue();
-  for (const order of queue.slice(0, 4)) {
-    const sent = await postOrder(order);
-    if (sent) {
-      removeQueued(order.id);
-      markLocalSynced(order.id);
-    }
-  }
-}
-
-/* ---------- 下单半屏 ---------- */
-let orderFlow = null;
-
-function qrFallbackMarkup() {
-  return `
+    `,actions:[{label:"复制微信号",kind:"primary",onClick:()=>copyText(CONFIG.wechatId)},{label:"关闭",kind:"text",onClick:closeSheet},],});}
+function orderInstallConfig(order){const config=order?.config||{};const legacyTrim=config.trimStyle;const fallbackTrims=legacyTrim?{top:legacyTrim,start:legacyTrim,hoodTop:legacyTrim,hoodBottom:legacyTrim}:DEFAULTS.trimStyles;return{...DEFAULTS,...config,trimStyles:{...fallbackTrims,...(config.trimStyles||{})},};}
+function validateCustomer(customer){const problems=[];const mark=(selector)=>$(selector)?.closest(".field")?.classList.add("is-invalid");$$(".field").forEach((field)=>field.classList.remove("is-invalid"));if(customer.name.length<2){mark("#coName");problems.push("请填写收货人姓名");}
+if(!/^1[3-9]\d{9}$/.test(customer.phone)){mark("#coPhone");problems.push("请填写 11 位手机号");}
+if(!customer.region){mark("#coRegion");problems.push("请填写所在地区");}
+if(customer.address.length<5){mark("#coAddress");problems.push("请填写详细地址");}
+return problems;}
+function makeOrderId(){const now=new Date();const date=`${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;return`YYJ${date}-${Math.floor(10000 + Math.random() * 90000)}`;}
+function createOrder(customer){const style=currentStyle();const price=priceInfo();return{id:makeOrderId(),createdAt:new Date().toISOString(),status:"awaiting_payment",source:"h5",style:{id:style.id,name:style.name,tone:style.tone},config:{...state,trimStyles:{...state.trimStyles}},price:{base:price.base,trim:price.trim,total:price.total,trimDetails:price.details},customer:{...customer},};}
+function readOrders(){const orders=readStored(STORAGE.orders,[]);return Array.isArray(orders)?orders:[];}
+function saveLocalOrder(order){const orders=readOrders();const index=orders.findIndex((item)=>item.id===order.id);if(index>=0)orders[index]=order;else orders.unshift(order);writeStored(STORAGE.orders,orders.slice(0,80));}
+function readQueue(){const queue=readStored(STORAGE.pending,[]);return Array.isArray(queue)?queue:[];}
+function queueOrder(order){const queue=readQueue().filter((item)=>item.id!==order.id);queue.unshift(order);writeStored(STORAGE.pending,queue.slice(0,20));}
+function removeQueued(id){writeStored(STORAGE.pending,readQueue().filter((item)=>item.id!==id));}
+function markLocalSynced(id){const orders=readOrders();const index=orders.findIndex((item)=>item.id===id);if(index>=0){orders[index].synced=true;writeStored(STORAGE.orders,orders);}}
+async function postOrder(order){if(!CONFIG.orderEndpoint)return false;const controller=new AbortController();const timer=window.setTimeout(()=>controller.abort(),4200);try{const response=await fetch(CONFIG.orderEndpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(order),signal:controller.signal,keepalive:true,});return response.ok;}catch{return false;}finally{clearTimeout(timer);}}
+async function submitOrder(order){order.submittedAt=new Date().toISOString();saveLocalOrder(order);const sent=await postOrder(order);order.synced=sent;if(sent){removeQueued(order.id);markLocalSynced(order.id);}else{queueOrder(order);}
+saveLocalOrder(order);writeStored(STORAGE.lastOrder,order);return order;}
+async function flushPending(){if(!CONFIG.orderEndpoint)return;const queue=readQueue();for(const order of queue.slice(0,4)){const sent=await postOrder(order);if(sent){removeQueued(order.id);markLocalSynced(order.id);}}}
+let orderFlow=null;function qrFallbackMarkup(){return`
     <svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
       <rect x="4" y="4" width="112" height="112" rx="14" fill="#fff" stroke="#e6ddcf" stroke-width="1.4" />
       <rect x="16" y="16" width="26" height="26" rx="5" stroke="#2f5d46" stroke-width="4" />
@@ -2672,11 +367,8 @@ function qrFallbackMarkup() {
       <path d="M55.5 57.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5c0 2-1.3 3.7-3.1 4.3v2.2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
       <circle cx="60" cy="67" r="1.1" fill="#fff" />
     </svg>
-    <span>收款码加载失败，请刷新重试</span>`;
-}
-
-function orderCheckoutHtml() {
-  return `
+    <span>收款码加载失败，请刷新重试</span>`;}
+function orderCheckoutHtml(){return`
     <p class="order-sealed-hint" id="orderSealedHint" hidden>订单已提交，资料仅供核对。</p>
     <form id="checkoutForm" class="order-step-form" novalidate>
       <div class="form-card">
@@ -2705,11 +397,8 @@ function orderCheckoutHtml() {
 
       <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
       <p class="form-error" id="formError" role="alert"></p>
-    </form>`;
-}
-
-function orderPayHtml() {
-  return `
+    </form>`;}
+function orderPayHtml(){return`
     <div class="order-step-pay">
       <div class="pay-card">
         <div class="pay-amount"><small>应付金额</small><b id="payAmount">${fmt(priceInfo().total)}</b></div>
@@ -2718,24 +407,17 @@ function orderPayHtml() {
           <div id="payQrFallback" class="qr-fallback" hidden>${qrFallbackMarkup()}</div>
         </div>
       </div>
-    </div>`;
-}
-
-function orderServiceHtml() {
-  const serviceQr = CONFIG.serviceQrImage || CONFIG.qrImage || "";
-  return `
+    </div>`;}
+function orderServiceHtml(){const serviceQr=CONFIG.serviceQrImage||CONFIG.qrImage||"";return`
     <div class="order-step-service">
       <p class="order-step-kicker">添加客服设计师🎨并发送手机号</p>
       <div class="service-qr order-step-qr">
-        ${serviceQr ? `<img id="orderServiceQr" src="${esc(serviceQr)}" alt="客服微信二维码" />` : ""}
+        ${serviceQr ? `<img id="orderServiceQr"src="${esc(serviceQr)}"alt="客服微信二维码"/>` : ""}
         <p class="order-step-empty" id="orderServiceQrFallback" ${serviceQr ? "hidden" : ""}>客服二维码待配置</p>
       </div>
       <div class="copy-row"><span>客服微信</span><b>${esc(CONFIG.wechatId)}</b><button type="button" data-copy-value="${esc(CONFIG.wechatId)}">复制</button></div>
-    </div>`;
-}
-
-function orderSheetHtml() {
-  return `
+    </div>`;}
+function orderSheetHtml(){return`
     <div class="order-flow">
       <nav class="order-steps" id="orderSteps" role="tablist" aria-label="下单步骤">
         <button type="button" role="tab" aria-selected="true" data-order-step="0"><span class="order-step-no" aria-hidden="true">1</span>填写订单</button>
@@ -2745,314 +427,41 @@ function orderSheetHtml() {
       <section class="order-step" data-order-panel="0" role="tabpanel">${orderCheckoutHtml()}</section>
       <section class="order-step" data-order-panel="1" role="tabpanel" hidden>${orderPayHtml()}</section>
       <section class="order-step" data-order-panel="2" role="tabpanel" hidden>${orderServiceHtml()}</section>
-    </div>`;
-}
-
-function openOrderSheet() {
-  pendingOrder = null;
-  try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
-  const flow = { step: 0, maxStep: 0, busy: false, sealed: false, order: null, actionButton: null };
-  orderFlow = flow;
-
-  openSheet({
-    title: "下单限时免运费",
-    backdrop: "light",
-    sheetClass: "sheet--order",
-    body: orderSheetHtml(),
-    actions: [{ label: "确认订单，去支付", kind: "primary", onClick: () => handleOrderFlowAction() }],
-    onClose: () => resetOrderFlow(flow),
-  });
-
-  flow.actionButton = $("#sheetActions .btn");
-
-  $("#checkoutForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    confirmOrderStep();
-  });
-  $$("#checkoutForm input, #checkoutForm textarea").forEach((input) => {
-    input.addEventListener("input", () => {
-      input.closest(".field")?.classList.remove("is-invalid");
-      if ($("#formError")) $("#formError").textContent = "";
-    });
-  });
-  $("#editConfig")?.addEventListener("click", () => {
-    if (orderFlow?.sealed) {
-      toast("已提交，如需修改请添加客服");
-      return;
-    }
-    closeSheet();
-    go("customize");
-  });
-  $("#checkoutForm .form-card")?.addEventListener("click", () => {
-    if (orderFlow?.sealed) toast("已提交，如需修改请添加客服");
-  });
-  $("#orderSteps")?.addEventListener("click", (event) => {
-    if (!orderFlow || orderFlow.busy) return;
-    const button = event.target.closest("[data-order-step]");
-    if (!button) return;
-    const flow = orderFlow;
-    const index = Number(button.dataset.orderStep);
-    if (index > flow.maxStep) {
-      toast("请先完成当前步骤");
-      return;
-    }
-    if (index === flow.step) return;
-    if (index === 1 && flow.step === 0 && !flow.sealed) {
-      confirmOrderStep();
-      return;
-    }
-    setOrderStep(index);
-  });
-  const serviceQr = $("#orderServiceQr");
-  if (serviceQr) {
-    serviceQr.addEventListener("error", () => {
-      serviceQr.hidden = true;
-      const fallback = $("#orderServiceQrFallback");
-      if (fallback) fallback.hidden = false;
-    });
-  }
-
-  renderCheckout();
-  setupQr();
-  setOrderStep(0);
-  const body = $("#sheetBody");
-  if (body) body.scrollTop = 0;
-}
-
-function resetOrderFlow(flow) {
-  if (orderFlow !== flow) return;
-  if (!flow.busy) {
-    pendingOrder = null;
-    try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
-  }
-  orderFlow = null;
-}
-
-function setOrderStep(step) {
-  const flow = orderFlow;
-  if (!flow || step < 0 || step > 2 || step > flow.maxStep) return;
-  flow.step = step;
-
-  $$("[data-order-panel]").forEach((panel) => {
-    panel.hidden = Number(panel.dataset.orderPanel) !== step;
-  });
-  $$("#orderSteps [data-order-step]").forEach((button, index) => {
-    const selected = index === step;
-    button.setAttribute("aria-selected", String(selected));
-    const locked = !selected && index > flow.maxStep;
-    button.classList.toggle("is-locked", locked);
-    button.setAttribute("aria-disabled", String(locked));
-  });
-
-  const labels = ["确认订单，去支付", "我付好了，去加客服", "已加客服，查看订单"];
-  const action = flow.actionButton;
-  if (action) {
-    action.textContent = flow.busy ? "正在提交…" : labels[step];
-    action.disabled = flow.busy;
-  }
-
-  if (step === 1) {
-    const order = pendingOrder || flow.order;
-    if ($("#payAmount")) $("#payAmount").textContent = fmt(order?.price?.total ?? priceInfo().total);
-    setupQr();
-  }
-
-  if (flow.sealed) {
-    $$("#checkoutForm input, #checkoutForm textarea").forEach((input) => { input.readOnly = true; });
-    $("#checkoutForm .form-card")?.classList.add("is-sealed");
-    if ($("#editConfig")) {
-      $("#editConfig").hidden = false;
-      $("#editConfig").classList.add("is-disabled");
-      $("#editConfig").setAttribute("aria-disabled", "true");
-    }
-    if ($("#orderSealedHint")) $("#orderSealedHint").hidden = false;
-  }
-  const body = $("#sheetBody");
-  if (body) body.scrollTop = 0;
-}
-
-function handleOrderFlowAction() {
-  const flow = orderFlow;
-  if (!flow || flow.busy) return;
-  if (flow.step === 0) {
-    if (flow.sealed) setOrderStep(1);
-    else confirmOrderStep();
-  } else if (flow.step === 1) {
-    if (flow.sealed) setOrderStep(2);
-    else finishPaymentStep();
-  } else {
-    finishAddStep();
-  }
-}
-
-function confirmOrderStep() {
-  const flow = orderFlow;
-  if (!flow) return;
-  if (flow.sealed) {
-    toast("已提交，如需修改请添加客服");
-    return;
-  }
-  const customer = getCustomer();
-  const problems = validateCustomer(customer);
-  const errorNode = $("#formError");
-  if (problems.length) {
-    if (errorNode) errorNode.textContent = problems[0];
-    $(".field.is-invalid")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    return;
-  }
-  if (errorNode) errorNode.textContent = "";
-  writeStored(STORAGE.customer, customer);
-  if (pendingOrder) {
-    pendingOrder.customer = { ...customer };
-  } else {
-    pendingOrder = createOrder(customer);
-  }
-  try { sessionStorage.setItem(STORAGE.pendingOrder, JSON.stringify(pendingOrder)); } catch { /* ignore */ }
-  flow.maxStep = Math.max(flow.maxStep, 1);
-  setOrderStep(1);
-}
-
-async function finishPaymentStep() {
-  const flow = orderFlow;
-  if (!flow || flow.busy) return;
-  if (!pendingOrder) {
-    toast("订单信息还没准备好");
-    setOrderStep(0);
-    return;
-  }
-  flow.busy = true;
-  setOrderStep(1);
-  const order = pendingOrder;
-  order.submitted = true;
-  try {
-    lastOrder = await submitOrder(order);
-  } catch {
-    lastOrder = order;
-    saveLocalOrder(order);
-    queueOrder(order);
-  }
-  pendingOrder = null;
-  try { sessionStorage.removeItem(STORAGE.pendingOrder); } catch { /* ignore */ }
-  if (orderFlow !== flow) return;
-  flow.order = lastOrder;
-  flow.sealed = true;
-  flow.maxStep = 2;
-  flow.busy = false;
-  setOrderStep(2);
-  toast("订单已提交，请添加客服微信");
-}
-
-function finishAddStep() {
-  const flow = orderFlow;
-  if (!flow?.order) {
-    toast("订单还没提交");
-    return;
-  }
-  activeOrder = flow.order;
-  closeSheet();
-  go("order");
-}
-
-function setupQr() {
-  const img = $("#payQr");
-  const fallback = $("#payQrFallback");
-  if (!img) return;
-  if (!CONFIG.qrImage) {
-    img.hidden = true;
-    if (fallback) fallback.hidden = false;
-    return;
-  }
-  if (img.dataset.loaded === "1") return;
-  img.onload = () => {
-    img.dataset.loaded = "1";
-    img.classList.add("is-loaded");
-    img.hidden = false;
-    if (fallback) fallback.hidden = true;
-  };
-  img.onerror = () => {
-    img.hidden = true;
-    if (fallback) fallback.hidden = false;
-  };
-  img.src = CONFIG.qrImage;
-}
-
-/* ---------- 弹层 / Toast ---------- */
-function lockSheetPageScroll() {
-  sheetPageScroll = window.scrollY || window.pageYOffset || 0;
-  document.body.style.top = `-${sheetPageScroll}px`;
-  document.body.classList.add("sheet-open");
-}
-
-function unlockSheetPageScroll() {
-  document.body.classList.remove("sheet-open");
-  document.body.style.top = "";
-  window.scrollTo(0, sheetPageScroll);
-}
-
-function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose = null, sheetClass = "" }) {
-  if (sheetOpen) sheetCleanup?.();
-  sheetCleanup = onClose;
-  lastFocused = document.activeElement;
-  const sheet = $(".sheet");
-  if (sheet) {
-    sheet.classList.remove("sheet--install", "sheet--order", "sheet--drawing");
-    if (sheetClass) sheet.classList.add(sheetClass);
-  }
-  $("#sheetTitle").textContent = title;
-  $("#sheetBody").innerHTML = body;
-  const actionsRoot = $("#sheetActions");
-  actionsRoot.innerHTML = "";
-  actions.forEach((action) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `btn ${action.kind === "primary" ? "btn-primary" : action.kind === "danger" ? "btn-outline danger" : "btn-text"}`;
-    button.textContent = action.label;
-    button.addEventListener("click", () => action.onClick?.(button));
-    actionsRoot.appendChild(button);
-  });
-  $("#sheetRoot").classList.toggle("is-light", backdrop === "light");
-  $("#sheetRoot").hidden = false;
-  if (!sheetOpen) lockSheetPageScroll();
-  sheetOpen = true;
-  window.setTimeout(() => $(".sheet-close")?.focus(), 60);
-}
-
-function closeSheet() {
-  if (!sheetOpen) return;
-  sheetOpen = false;
-  const cleanup = sheetCleanup;
-  sheetCleanup = null;
-  if (cleanup) cleanup();
-  $(".sheet")?.classList.remove("sheet--install", "sheet--order", "sheet--drawing");
-  $("#sheetRoot").hidden = true;
-  $("#sheetRoot").classList.remove("is-light");
-  unlockSheetPageScroll();
-  if (lastFocused?.focus) lastFocused.focus();
-}
-
-function disposeMiniInstall() {
-  miniInstallToken++;
-  miniInstallApi?.dispose();
-  miniInstallApi = null;
-}
-
-function openInstallGuide(config = state) {
-  disposeMiniInstall();
-  const installConfig = {
-    ...DEFAULTS,
-    ...config,
-    trimStyles: { ...(config.trimStyles || DEFAULTS.trimStyles) },
-  };
-  const steps = installStepsFor(installConfig);
-  if (!steps.length) return;
-  let replayCurrent = () => {};
-
-  openSheet({
-    title: "安装说明",
-    backdrop: "light",
-    sheetClass: "sheet--install",
-    onClose: disposeMiniInstall,
-    body: `
+    </div>`;}
+function openOrderSheet(){pendingOrder=null;try{sessionStorage.removeItem(STORAGE.pendingOrder);}catch{}
+const flow={step:0,maxStep:0,busy:false,sealed:false,order:null,actionButton:null};orderFlow=flow;openSheet({title:"下单限时免运费",backdrop:"light",sheetClass:"sheet--order",body:orderSheetHtml(),actions:[{label:"确认订单，去支付",kind:"primary",onClick:()=>handleOrderFlowAction()}],onClose:()=>resetOrderFlow(flow),});flow.actionButton=$("#sheetActions .btn");$("#checkoutForm")?.addEventListener("submit",(event)=>{event.preventDefault();confirmOrderStep();});$$("#checkoutForm input, #checkoutForm textarea").forEach((input)=>{input.addEventListener("input",()=>{input.closest(".field")?.classList.remove("is-invalid");if($("#formError"))$("#formError").textContent="";});});$("#editConfig")?.addEventListener("click",()=>{if(orderFlow?.sealed){toast("已提交，如需修改请添加客服");return;}
+closeSheet();go("customize");});$("#checkoutForm .form-card")?.addEventListener("click",()=>{if(orderFlow?.sealed)toast("已提交，如需修改请添加客服");});$("#orderSteps")?.addEventListener("click",(event)=>{if(!orderFlow||orderFlow.busy)return;const button=event.target.closest("[data-order-step]");if(!button)return;const flow=orderFlow;const index=Number(button.dataset.orderStep);if(index>flow.maxStep){toast("请先完成当前步骤");return;}
+if(index===flow.step)return;if(index===1&&flow.step===0&&!flow.sealed){confirmOrderStep();return;}
+setOrderStep(index);});const serviceQr=$("#orderServiceQr");if(serviceQr){serviceQr.addEventListener("error",()=>{serviceQr.hidden=true;const fallback=$("#orderServiceQrFallback");if(fallback)fallback.hidden=false;});}
+renderCheckout();setupQr();setOrderStep(0);const body=$("#sheetBody");if(body)body.scrollTop=0;}
+function resetOrderFlow(flow){if(orderFlow!==flow)return;if(!flow.busy){pendingOrder=null;try{sessionStorage.removeItem(STORAGE.pendingOrder);}catch{}}
+orderFlow=null;}
+function setOrderStep(step){const flow=orderFlow;if(!flow||step<0||step>2||step>flow.maxStep)return;flow.step=step;$$("[data-order-panel]").forEach((panel)=>{panel.hidden=Number(panel.dataset.orderPanel)!==step;});$$("#orderSteps [data-order-step]").forEach((button,index)=>{const selected=index===step;button.setAttribute("aria-selected",String(selected));const locked=!selected&&index>flow.maxStep;button.classList.toggle("is-locked",locked);button.setAttribute("aria-disabled",String(locked));});const labels=["确认订单，去支付","我付好了，去加客服","已加客服，查看订单"];const action=flow.actionButton;if(action){action.textContent=flow.busy?"正在提交…":labels[step];action.disabled=flow.busy;}
+if(step===1){const order=pendingOrder||flow.order;if($("#payAmount"))$("#payAmount").textContent=fmt(order?.price?.total??priceInfo().total);setupQr();}
+if(flow.sealed){$$("#checkoutForm input, #checkoutForm textarea").forEach((input)=>{input.readOnly=true;});$("#checkoutForm .form-card")?.classList.add("is-sealed");if($("#editConfig")){$("#editConfig").hidden=false;$("#editConfig").classList.add("is-disabled");$("#editConfig").setAttribute("aria-disabled","true");}
+if($("#orderSealedHint"))$("#orderSealedHint").hidden=false;}
+const body=$("#sheetBody");if(body)body.scrollTop=0;}
+function handleOrderFlowAction(){const flow=orderFlow;if(!flow||flow.busy)return;if(flow.step===0){if(flow.sealed)setOrderStep(1);else confirmOrderStep();}else if(flow.step===1){if(flow.sealed)setOrderStep(2);else finishPaymentStep();}else{finishAddStep();}}
+function confirmOrderStep(){const flow=orderFlow;if(!flow)return;if(flow.sealed){toast("已提交，如需修改请添加客服");return;}
+const customer=getCustomer();const problems=validateCustomer(customer);const errorNode=$("#formError");if(problems.length){if(errorNode)errorNode.textContent=problems[0];$(".field.is-invalid")?.scrollIntoView({behavior:"smooth",block:"center"});return;}
+if(errorNode)errorNode.textContent="";writeStored(STORAGE.customer,customer);if(pendingOrder){pendingOrder.customer={...customer};}else{pendingOrder=createOrder(customer);}
+try{sessionStorage.setItem(STORAGE.pendingOrder,JSON.stringify(pendingOrder));}catch{}
+flow.maxStep=Math.max(flow.maxStep,1);setOrderStep(1);}
+async function finishPaymentStep(){const flow=orderFlow;if(!flow||flow.busy)return;if(!pendingOrder){toast("订单信息还没准备好");setOrderStep(0);return;}
+flow.busy=true;setOrderStep(1);const order=pendingOrder;order.submitted=true;try{lastOrder=await submitOrder(order);}catch{lastOrder=order;saveLocalOrder(order);queueOrder(order);}
+pendingOrder=null;try{sessionStorage.removeItem(STORAGE.pendingOrder);}catch{}
+if(orderFlow!==flow)return;flow.order=lastOrder;flow.sealed=true;flow.maxStep=2;flow.busy=false;setOrderStep(2);toast("订单已提交，请添加客服微信");}
+function finishAddStep(){const flow=orderFlow;if(!flow?.order){toast("订单还没提交");return;}
+activeOrder=flow.order;closeSheet();go("order");}
+function setupQr(){const img=$("#payQr");const fallback=$("#payQrFallback");if(!img)return;if(!CONFIG.qrImage){img.hidden=true;if(fallback)fallback.hidden=false;return;}
+if(img.dataset.loaded==="1")return;img.onload=()=>{img.dataset.loaded="1";img.classList.add("is-loaded");img.hidden=false;if(fallback)fallback.hidden=true;};img.onerror=()=>{img.hidden=true;if(fallback)fallback.hidden=false;};img.src=CONFIG.qrImage;}
+function lockSheetPageScroll(){sheetPageScroll=window.scrollY||window.pageYOffset||0;document.body.style.top=`-${sheetPageScroll}px`;document.body.classList.add("sheet-open");}
+function unlockSheetPageScroll(){document.body.classList.remove("sheet-open");document.body.style.top="";window.scrollTo(0,sheetPageScroll);}
+function openSheet({title,body="",actions=[],backdrop="dark",onClose=null,sheetClass=""}){if(sheetOpen)sheetCleanup?.();sheetCleanup=onClose;lastFocused=document.activeElement;const sheet=$(".sheet");if(sheet){sheet.classList.remove("sheet--install","sheet--order","sheet--drawing");if(sheetClass)sheet.classList.add(sheetClass);}
+$("#sheetTitle").textContent=title;$("#sheetBody").innerHTML=body;const actionsRoot=$("#sheetActions");actionsRoot.innerHTML="";actions.forEach((action)=>{const button=document.createElement("button");button.type="button";button.className=`btn ${action.kind === "primary" ? "btn-primary" : action.kind === "danger" ? "btn-outline danger" : "btn-text"}`;button.textContent=action.label;button.addEventListener("click",()=>action.onClick?.(button));actionsRoot.appendChild(button);});$("#sheetRoot").classList.toggle("is-light",backdrop==="light");$("#sheetRoot").hidden=false;if(!sheetOpen)lockSheetPageScroll();sheetOpen=true;window.setTimeout(()=>$(".sheet-close")?.focus(),60);}
+function closeSheet(){if(!sheetOpen)return;sheetOpen=false;const cleanup=sheetCleanup;sheetCleanup=null;if(cleanup)cleanup();$(".sheet")?.classList.remove("sheet--install","sheet--order","sheet--drawing");$("#sheetRoot").hidden=true;$("#sheetRoot").classList.remove("is-light");unlockSheetPageScroll();if(lastFocused?.focus)lastFocused.focus();}
+function disposeMiniInstall(){miniInstallToken++;miniInstallApi?.dispose();miniInstallApi=null;}
+function openInstallGuide(config=state){disposeMiniInstall();const installConfig={...DEFAULTS,...config,trimStyles:{...(config.trimStyles||DEFAULTS.trimStyles)},};const steps=installStepsFor(installConfig);if(!steps.length)return;let replayCurrent=()=>{};openSheet({title:"安装说明",backdrop:"light",sheetClass:"sheet--install",onClose:disposeMiniInstall,body:`
       <div class="mini-install">
         <nav class="mini-install-tabs" id="miniInstallTabs" role="tablist" aria-label="安装步骤"></nav>
         <div class="mini-install-stage" id="miniInstallStage" aria-label="安装步骤三维演示"></div>
@@ -3061,88 +470,12 @@ function openInstallGuide(config = state) {
           <p id="miniInstallDesc"></p>
         </div>
       </div>
-    `,
-    actions: [
-      { label: "重新播放", kind: "primary", onClick: () => replayCurrent() },
-    ],
-  });
-
-  const nav = $("#miniInstallTabs");
-  const stage = $("#miniInstallStage");
-  if (!nav || !stage) return;
-
-  nav.innerHTML = steps
-    .map((step, index) => `<button role="tab" aria-selected="false" data-key="${step.key}" type="button"><span class="mini-install-step">${stepMark(index)}</span>${step.name}</button>`)
-    .join("");
-
-  let currentKey = steps[0].key;
-  const apply = (key, animate) => {
-    const info = steps.find((step) => step.key === key) || steps[0];
-    currentKey = info.key;
-    nav.querySelectorAll("button").forEach((button) => {
-      button.setAttribute("aria-selected", String(button.dataset.key === info.key));
-    });
-    if ($("#miniInstallTitle")) $("#miniInstallTitle").textContent = info.title;
-    if ($("#miniInstallDesc")) $("#miniInstallDesc").textContent = info.desc;
-    miniInstallApi?.setStep(info.key, { animate });
-  };
-
-  replayCurrent = () => apply(currentKey, true);
-  apply(currentKey, false);
-  nav.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-key]");
-    if (button) apply(button.dataset.key, true);
-  });
-
-  const token = ++miniInstallToken;
-  import("./install3d.js")
-    .then(({ createInstallScene }) => {
-      if (token !== miniInstallToken || !sheetOpen || !stage) return;
-      try {
-        miniInstallApi = createInstallScene(stage, installConfig, { compact: true });
-        miniInstallApi.setStep(currentKey, { animate: true });
-      } catch (error) {
-        console.warn("半屏安装演示初始化失败", error);
-        stage.classList.add("is-fallback");
-        stage.textContent = "当前设备暂不支持 3D 演示";
-      }
-    })
-    .catch((error) => {
-      console.warn("半屏安装演示加载失败", error);
-      stage.classList.add("is-fallback");
-      stage.textContent = "当前设备暂不支持 3D 演示";
-    });
-}
-
-function toast(message) {
-  const node = $("#toast");
-  if (!node) return;
-  node.textContent = message;
-  node.classList.add("is-show");
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => node.classList.remove("is-show"), 2400);
-}
-
-async function copyText(text, message = "已复制") {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast(message);
-    return;
-  } catch { /* fall through */ }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  try { document.execCommand("copy"); toast(message); } catch { toast("复制失败，请手动选择"); }
-  textarea.remove();
-}
-
-function openHelp(kind) {
-  const art = (svg) => `<div class="sheet-help-art">${svg}</div>`;
-  const measureArt = art(`<svg viewBox="0 0 320 116">
+    `,actions:[{label:"重新播放",kind:"primary",onClick:()=>replayCurrent()},],});const nav=$("#miniInstallTabs");const stage=$("#miniInstallStage");if(!nav||!stage)return;nav.innerHTML=steps.map((step,index)=>`<button role="tab" aria-selected="false" data-key="${step.key}" type="button"><span class="mini-install-step">${stepMark(index)}</span>${step.name}</button>`).join("");let currentKey=steps[0].key;const apply=(key,animate)=>{const info=steps.find((step)=>step.key===key)||steps[0];currentKey=info.key;nav.querySelectorAll("button").forEach((button)=>{button.setAttribute("aria-selected",String(button.dataset.key===info.key));});if($("#miniInstallTitle"))$("#miniInstallTitle").textContent=info.title;if($("#miniInstallDesc"))$("#miniInstallDesc").textContent=info.desc;miniInstallApi?.setStep(info.key,{animate});};replayCurrent=()=>apply(currentKey,true);apply(currentKey,false);nav.addEventListener("click",(event)=>{const button=event.target.closest("[data-key]");if(button)apply(button.dataset.key,true);});const token=++miniInstallToken;import("./install3d.js?v=f4d2ea3684").then(({createInstallScene})=>{if(token!==miniInstallToken||!sheetOpen||!stage)return;try{miniInstallApi=createInstallScene(stage,installConfig,{compact:true});miniInstallApi.setStep(currentKey,{animate:true});}catch(error){console.warn("半屏安装演示初始化失败",error);stage.classList.add("is-fallback");stage.textContent="当前设备暂不支持 3D 演示";}}).catch((error)=>{console.warn("半屏安装演示加载失败",error);stage.classList.add("is-fallback");stage.textContent="当前设备暂不支持 3D 演示";});}
+function toast(message){const node=$("#toast");if(!node)return;node.textContent=message;node.classList.add("is-show");clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>node.classList.remove("is-show"),2400);}
+async function copyText(text,message="已复制"){try{await navigator.clipboard.writeText(text);toast(message);return;}catch{}
+const textarea=document.createElement("textarea");textarea.value=text;textarea.setAttribute("readonly","");textarea.style.position="fixed";textarea.style.opacity="0";document.body.appendChild(textarea);textarea.select();try{document.execCommand("copy");toast(message);}catch{toast("复制失败，请手动选择");}
+textarea.remove();}
+function openHelp(kind){const art=(svg)=>`<div class="sheet-help-art">${svg}</div>`;const measureArt=art(`<svg viewBox="0 0 320 116">
     <path d="M26 16v82" stroke="#c9b79d" stroke-width="1.6" stroke-dasharray="4 4"/>
     <path d="M20 96h280" stroke="#ddd2c2" stroke-width="1.2"/>
     <path d="M58 96V38h206v58" fill="#f5ecdf" stroke="#c9b79d" stroke-width="1.3" stroke-linejoin="round"/>
@@ -3153,281 +486,26 @@ function openHelp(kind) {
     <path d="M286 38v58" stroke="#245c45" stroke-width="1.2" stroke-linecap="round"/>
     <path d="M281 38h10m-10 58h10" stroke="#245c45" stroke-width="1.2" stroke-linecap="round"/>
     <text x="300" y="70" font-size="8" fill="#245c45">深</text>
-  </svg>`);
-  const contents = {
-    measure: {
-      title: "量尺寸之前，先看三件事",
-      body: `${measureArt}<ul class="sheet-list">
+  </svg>`);const contents={measure:{title:"量尺寸之前，先看三件事",body:`${measureArt}<ul class="sheet-list">
         <li>量油烟机本体，不量旧罩子或吊柜。</li>
         <li>宽度量最外沿；深度从墙面量到最外沿。</li>
         <li>高度从下横顶面量到烟道顶；靠墙侧和前侧分别量。</li>
-      </ul><p class="sheet-note">拿不准就把正面和侧面照片发给客服，我们帮你核。</p>`,
-    },
-    chimney: {
-      title: "上竖怎么量",
-      body: `<p>上竖是烟道那一段。量三个数据：</p><ul class="sheet-list">
+      </ul><p class="sheet-note">拿不准就把正面和侧面照片发给客服，我们帮你核。</p>`,},chimney:{title:"上竖怎么量",body:`<p>上竖是烟道那一段。量三个数据：</p><ul class="sheet-list">
         <li><b>宽：</b>烟道左右最外沿的距离。</li>
         <li><b>深：</b>从墙面到烟道前外沿。</li>
         <li><b>高：</b>从下横顶面到烟道顶部。</li>
-      </ul><p class="sheet-note">外罩会自动加 5mm 安装间隙，不用自己留。</p>`,
-    },
-    hood: {
-      title: "下横怎么量",
-      body: `<p>下横是集烟罩这一圈。量四个数据：</p><ul class="sheet-list">
+      </ul><p class="sheet-note">外罩会自动加 5mm 安装间隙，不用自己留。</p>`,},hood:{title:"下横怎么量",body:`<p>下横是集烟罩这一圈。量四个数据：</p><ul class="sheet-list">
         <li><b>宽 / 深：</b>油烟机本体的最外沿。</li>
         <li><b>靠墙侧高：</b>贴墙那一侧的高度。</li>
         <li><b>前侧高：</b>朝外这一侧的高度，通常比靠墙侧低。</li>
-      </ul><p class="sheet-note">前侧高至少比靠墙侧低 30mm，页面会自动帮你限制。</p>`,
-    },
-    shim: {
-      title: "垫高",
-      body: `${art(`<svg viewBox="0 0 320 132">
-        <path d="M30 12v110" stroke="#ddd2c2" stroke-width="1.2" stroke-dasharray="4 4"/>
-        <rect x="56" y="26" width="208" height="7" rx="2" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.3"/>
-        <rect x="56" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
-        <rect x="257" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
-        <rect x="63" y="70" width="194" height="34" rx="3" fill="#e7e3db" stroke="#b7b1a6" stroke-width="1.2"/>
-        <rect x="63" y="33" width="18" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
-        <rect x="239" y="33" width="18" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
-        <text x="160" y="21" text-anchor="middle" font-size="8" fill="#7a6248">定制罩</text>
-        <text x="72" y="55" text-anchor="middle" font-size="7" fill="#6b4f2f">垫高</text>
-        <text x="248" y="55" text-anchor="middle" font-size="7" fill="#6b4f2f">垫高</text>
-        <text x="160" y="90" text-anchor="middle" font-size="9" fill="#777a72">油烟机</text>
-        <path d="M286 64V40" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
-        <path d="M280 46l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="298" y="56" font-size="8" fill="#245c45">抬高</text>
-      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。垫板分左右两块装在罩体内部，贴着油烟机外罩两侧安装。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
-    },
-    install: {
-      title: "安装小贴士",
-      body: `<ul class="sheet-list">
+      </ul><p class="sheet-note">前侧高至少比靠墙侧低 30mm，页面会自动帮你限制。</p>`,},shim:{title:"垫高",body:`${art(`<svg viewBox="0 0 320 132"><path d="M30 12v110"stroke="#ddd2c2"stroke-width="1.2"stroke-dasharray="4 4"/><rect x="56"y="26"width="208"height="7"rx="2"fill="#f4e8d8"stroke="#c9b79d"stroke-width="1.3"/><rect x="56"y="33"width="7"height="71"fill="#f4e8d8"stroke="#c9b79d"stroke-width="1.1"/><rect x="257"y="33"width="7"height="71"fill="#f4e8d8"stroke="#c9b79d"stroke-width="1.1"/><rect x="63"y="70"width="194"height="34"rx="3"fill="#e7e3db"stroke="#b7b1a6"stroke-width="1.2"/><rect x="63"y="33"width="18"height="37"rx="2"fill="#d8be9e"stroke="#b89d7a"stroke-width="1.2"/><rect x="239"y="33"width="18"height="37"rx="2"fill="#d8be9e"stroke="#b89d7a"stroke-width="1.2"/><text x="160"y="21"text-anchor="middle"font-size="8"fill="#7a6248">定制罩</text><text x="72"y="55"text-anchor="middle"font-size="7"fill="#6b4f2f">垫高</text><text x="248"y="55"text-anchor="middle"font-size="7"fill="#6b4f2f">垫高</text><text x="160"y="90"text-anchor="middle"font-size="9"fill="#777a72">油烟机</text><path d="M286 64V40"stroke="#245c45"stroke-width="1.3"stroke-linecap="round"/><path d="M280 46l6-8 6 8"fill="none"stroke="#245c45"stroke-width="1.3"stroke-linecap="round"stroke-linejoin="round"/><text x="298"y="56"font-size="8"fill="#245c45">抬高</text></svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。垫板分左右两块装在罩体内部，贴着油烟机外罩两侧安装。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,},install:{title:"安装小贴士",body:`<ul class="sheet-list">
         <li>先在地面把主体拼好，再整体套上去。</li>
         <li>曲面和装饰条最后贴，胶水未干前不要搬动。</li>
         <li>502 胶点涂即可，不要整条挤满，避免溢胶。</li>
         <li>刷漆薄涂两遍，每遍间隔 30 分钟，阴干 24 小时。</li>
-      </ul><p class="sheet-note">需要视频？加微信 ${esc(CONFIG.wechatId)}，发你完整安装视频。</p>`,
-    },
-  };
-  const content = contents[kind] || contents.measure;
-  openSheet({ title: content.title, body: content.body, actions: [{ label: "知道了", kind: "primary" }] });
-}
-
-/* ---------- 事件 ---------- */
-function bindEvents() {
-  $$("[data-back]").forEach((button) => button.addEventListener("click", () => go(backTarget())));
-  $$("[data-help]").forEach((button) => button.addEventListener("click", () => openHelp(button.dataset.help)));
-
-  $$("#customizeTabs button").forEach((button) => {
-    button.addEventListener("click", () => {
-      const tab = button.dataset.tab;
-      setCustomizeTab(tab);
-      previewApi?.highlightPart(tab);
-      previewApi?.focusView(tab === "decor" ? "curve" : tab);
-    });
-  });
-
-  for (const container of [$("#chimneyDims"), $("#hoodDims"), $("#notchDims")]) {
-    if (!container) continue;
-    container.addEventListener("click", (event) => {
-      const stepButton = event.target.closest("[data-step]");
-      if (!stepButton) return;
-      const row = stepButton.closest(".dim-row");
-      const key = row?.dataset.dim;
-      if (!key) return;
-      setDim(key, Number(state[key]) + Number(stepButton.dataset.step), false);
-    });
-    container.addEventListener("input", (event) => {
-      if (!event.target.matches("input")) return;
-      const row = event.target.closest(".dim-row");
-      const key = row?.dataset.dim;
-      if (!key) return;
-      const value = Number(event.target.value);
-      if (!Number.isFinite(value)) return;
-      const dim = DIMS[key];
-      state[key] = clamp(value, dim.min, dim.max);
-      normalizeState();
-      syncUI({ activeInput: event.target, writeInputs: true });
-      markDirty();
-    });
-    container.addEventListener("change", (event) => {
-      if (!event.target.matches("input")) return;
-      const row = event.target.closest(".dim-row");
-      const key = row?.dataset.dim;
-      if (!key) return;
-      setDim(key, Number(event.target.value), false);
-    });
-    container.addEventListener("click", (event) => {
-      const row = event.target.closest(".dim-row");
-      if (!row) return;
-      const view = DIM_VIEW[row.dataset.dim];
-      if (view) previewApi?.focusView(view);
-    });
-  }
-
-  $(".shim-row")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-shim-step]");
-    if (!button) return;
-    state.shimHeight = clamp(Number(state.shimHeight) + Number(button.dataset.shimStep), 0, 60);
-    syncUI({ writeInputs: true });
-    markDirty();
-  });
-  $(".shim-row")?.addEventListener("click", () => previewApi?.focusView("shim"));
-
-  $("#notchOptions")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-notch]");
-    if (!button) return;
-    state.notchShape = button.dataset.notch;
-    state.notchEnabled = true;
-    syncUI();
-    markDirty();
-  });
-
-  $("#curveOptions")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-curve]");
-    if (!button) return;
-    state.surfaceType = button.dataset.curve;
-    syncUI();
-    markDirty();
-  });
-  $("#startOptions")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-start]");
-    if (!button) return;
-    state.surfaceStart = button.dataset.start;
-    syncUI();
-    markDirty();
-  });
-  $("#trimList")?.addEventListener("click", (event) => {
-    const row = event.target.closest("[data-trim-position]");
-    if (!row) return;
-    openTrimPicker(row.dataset.trimPosition);
-  });
-  $("#sheetBody")?.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-pick-trim]");
-    if (!card) return;
-    const key = card.dataset.pickTrim;
-    const styleId = card.dataset.trimStyle;
-    if (!TRIM_POSITIONS.some((position) => position.key === key)) return;
-    if (!TRIMS.some((trim) => trim.id === styleId)) return;
-    state.trimStyles = { ...state.trimStyles, [key]: styleId };
-    syncUI({ writeInputs: true });
-    markDirty();
-    $$("#sheetBody .trim-picker-card").forEach((card) => {
-      card.classList.toggle("is-active", card.dataset.pickTrim === key && card.dataset.trimStyle === styleId);
-    });
-  });
-
-  $$('[data-action="clear"]').forEach((button) => {
-    button.addEventListener("click", () => {
-      openSheet({
-        title: "重置当前定制？",
-        body: "<p>尺寸和装饰会恢复默认。</p>",
-        actions: [
-          {
-            label: "重置", kind: "danger", onClick: () => {
-              Object.assign(state, DEFAULTS, { trimStyles: { ...DEFAULTS.trimStyles } });
-              normalizeState();
-              syncUI({ writeInputs: true });
-              setCustomizeTab("upper");
-              closeSheet();
-              toast("已恢复默认方案");
-            },
-          },
-          { label: "取消", kind: "text", onClick: closeSheet },
-        ],
-      });
-    });
-  });
-
-  $("#nextBtn")?.addEventListener("click", () => openOrderSheet());
-  $("#installGuideBtn")?.addEventListener("click", () => openInstallGuide());
-  $("#orderInstallBtn")?.addEventListener("click", () => {
-    if (activeOrder) openInstallGuide(orderInstallConfig(activeOrder));
-  });
-  $("#orderDrawingBtn")?.addEventListener("click", openOrderDrawing);
-
-  $("#orderSearchForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    searchOrders($("#orderPhone")?.value);
-  });
-  $("#orderPhone")?.addEventListener("input", (event) => {
-    event.target.value = normalizePhone(event.target.value);
-  });
-  $("#orderResults")?.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-order-id]");
-    if (!card) return;
-    openOrderDetail(orderResultsCache.find((order) => order.id === card.dataset.orderId));
-  });
-  $("#orderResults")?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const card = event.target.closest("[data-order-id]");
-    if (!card) return;
-    event.preventDefault();
-    openOrderDetail(orderResultsCache.find((order) => order.id === card.dataset.orderId));
-  });
-  $("#ordersBottomContact")?.addEventListener("click", openServiceSheet);
-  $("#installBack")?.addEventListener("click", () => go("customize"));
-  $("#installNext")?.addEventListener("click", () => openOrderSheet());
-  $("#installTabs")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-key]");
-    if (!button) return;
-    setInstallStep(button.dataset.key, true);
-  });
-  $("#replayBtn")?.addEventListener("click", () => setInstallStep(activeInstallKey, true));
-
-  $("#sheetRoot")?.addEventListener("click", (event) => {
-    if (event.target.closest("[data-sheet-close]")) closeSheet();
-    const copyButton = event.target.closest("[data-copy-value]");
-    if (copyButton) copyText(copyButton.dataset.copyValue);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && sheetOpen) closeSheet();
-    if (event.key === "Tab" && sheetOpen) {
-      const focusables = $$("button, [href], input, textarea, [tabindex]:not([tabindex='-1'])", $("#sheetRoot"));
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
-  });
-
-  window.addEventListener("hashchange", renderRoute);
-  window.addEventListener("online", flushPending);
-  window.addEventListener("pageshow", flushPending);
-}
-
-/* ---------- 初始化 ---------- */
-async function init() {
-  await loadSiteContent();
-  state = { ...DEFAULTS, trimStyles: { ...DEFAULTS.trimStyles } };
-  normalizeState();
-
-  renderHomeCases();
-  renderDims();
-  renderCurveOptions();
-  renderStartOptions();
-  renderTrimList();
-  renderNotchOptions();
-  renderNotchDims();
-
-  bindEvents();
-  syncUI({ writeInputs: true });
-  renderRoute();
-  flushPending();
-
-  // 定制页是整屏沉浸式布局：除底部面板和弹层外，拖拽不再带动页面滚动 / 回弹。
-  document.addEventListener("touchmove", (event) => {
-    if (currentRoute() !== "customize") return;
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (target.closest(".custom-panels, .sheet")) return;
-    if (event.cancelable) event.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopCaseAuto();
-    else if (currentRoute() === "home") restartCaseAuto();
-  });
-}
-
+      </ul><p class="sheet-note">需要视频？加微信 ${esc(CONFIG.wechatId)}，发你完整安装视频。</p>`,},};const content=contents[kind]||contents.measure;openSheet({title:content.title,body:content.body,actions:[{label:"知道了",kind:"primary"}]});}
+function bindEvents(){$$("[data-back]").forEach((button)=>button.addEventListener("click",()=>go(backTarget())));$$("[data-help]").forEach((button)=>button.addEventListener("click",()=>openHelp(button.dataset.help)));$$("#customizeTabs button").forEach((button)=>{button.addEventListener("click",()=>{const tab=button.dataset.tab;setCustomizeTab(tab);previewApi?.highlightPart(tab);previewApi?.focusView(tab==="decor"?"curve":tab);});});for(const container of[$("#chimneyDims"),$("#hoodDims"),$("#notchDims")]){if(!container)continue;container.addEventListener("click",(event)=>{const stepButton=event.target.closest("[data-step]");if(!stepButton)return;const row=stepButton.closest(".dim-row");const key=row?.dataset.dim;if(!key)return;setDim(key,Number(state[key])+Number(stepButton.dataset.step),false);});container.addEventListener("input",(event)=>{if(!event.target.matches("input"))return;const row=event.target.closest(".dim-row");const key=row?.dataset.dim;if(!key)return;const value=Number(event.target.value);if(!Number.isFinite(value))return;const dim=DIMS[key];state[key]=clamp(value,dim.min,dim.max);normalizeState();syncUI({activeInput:event.target,writeInputs:true});markDirty();});container.addEventListener("change",(event)=>{if(!event.target.matches("input"))return;const row=event.target.closest(".dim-row");const key=row?.dataset.dim;if(!key)return;setDim(key,Number(event.target.value),false);});container.addEventListener("click",(event)=>{const row=event.target.closest(".dim-row");if(!row)return;const view=DIM_VIEW[row.dataset.dim];if(view)previewApi?.focusView(view);});}
+$(".shim-row")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-shim-step]");if(!button)return;state.shimHeight=clamp(Number(state.shimHeight)+Number(button.dataset.shimStep),0,60);syncUI({writeInputs:true});markDirty();});$(".shim-row")?.addEventListener("click",()=>previewApi?.focusView("shim"));$("#notchOptions")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-notch]");if(!button)return;state.notchShape=button.dataset.notch;state.notchEnabled=true;syncUI();markDirty();});$("#curveOptions")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-curve]");if(!button)return;state.surfaceType=button.dataset.curve;syncUI();markDirty();});$("#startOptions")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-start]");if(!button)return;state.surfaceStart=button.dataset.start;syncUI();markDirty();});$("#trimList")?.addEventListener("click",(event)=>{const row=event.target.closest("[data-trim-position]");if(!row)return;openTrimPicker(row.dataset.trimPosition);});$("#sheetBody")?.addEventListener("click",(event)=>{const card=event.target.closest("[data-pick-trim]");if(!card)return;const key=card.dataset.pickTrim;const styleId=card.dataset.trimStyle;if(!TRIM_POSITIONS.some((position)=>position.key===key))return;if(!TRIMS.some((trim)=>trim.id===styleId))return;state.trimStyles={...state.trimStyles,[key]:styleId};syncUI({writeInputs:true});markDirty();$$("#sheetBody .trim-picker-card").forEach((card)=>{card.classList.toggle("is-active",card.dataset.pickTrim===key&&card.dataset.trimStyle===styleId);});});$$('[data-action="clear"]').forEach((button)=>{button.addEventListener("click",()=>{openSheet({title:"重置当前定制？",body:"<p>尺寸和装饰会恢复默认。</p>",actions:[{label:"重置",kind:"danger",onClick:()=>{Object.assign(state,DEFAULTS,{trimStyles:{...DEFAULTS.trimStyles}});normalizeState();syncUI({writeInputs:true});setCustomizeTab("upper");closeSheet();toast("已恢复默认方案");},},{label:"取消",kind:"text",onClick:closeSheet},],});});});$("#nextBtn")?.addEventListener("click",()=>openOrderSheet());$("#installGuideBtn")?.addEventListener("click",()=>openInstallGuide());$("#orderInstallBtn")?.addEventListener("click",()=>{if(activeOrder)openInstallGuide(orderInstallConfig(activeOrder));});$("#orderDrawingBtn")?.addEventListener("click",openOrderDrawing);$("#orderSearchForm")?.addEventListener("submit",(event)=>{event.preventDefault();searchOrders($("#orderPhone")?.value);});$("#orderPhone")?.addEventListener("input",(event)=>{event.target.value=normalizePhone(event.target.value);});$("#orderResults")?.addEventListener("click",(event)=>{const card=event.target.closest("[data-order-id]");if(!card)return;openOrderDetail(orderResultsCache.find((order)=>order.id===card.dataset.orderId));});$("#orderResults")?.addEventListener("keydown",(event)=>{if(event.key!=="Enter"&&event.key!==" ")return;const card=event.target.closest("[data-order-id]");if(!card)return;event.preventDefault();openOrderDetail(orderResultsCache.find((order)=>order.id===card.dataset.orderId));});$("#ordersBottomContact")?.addEventListener("click",openServiceSheet);$("#installBack")?.addEventListener("click",()=>go("customize"));$("#installNext")?.addEventListener("click",()=>openOrderSheet());$("#installTabs")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-key]");if(!button)return;setInstallStep(button.dataset.key,true);});$("#replayBtn")?.addEventListener("click",()=>setInstallStep(activeInstallKey,true));$("#sheetRoot")?.addEventListener("click",(event)=>{if(event.target.closest("[data-sheet-close]"))closeSheet();const copyButton=event.target.closest("[data-copy-value]");if(copyButton)copyText(copyButton.dataset.copyValue);});document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&sheetOpen)closeSheet();if(event.key==="Tab"&&sheetOpen){const focusables=$$("button, [href], input, textarea, [tabindex]:not([tabindex='-1'])",$("#sheetRoot"));if(!focusables.length)return;const first=focusables[0];const last=focusables[focusables.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});window.addEventListener("hashchange",renderRoute);window.addEventListener("online",flushPending);window.addEventListener("pageshow",flushPending);}
+async function init(){await loadSiteContent();state={...DEFAULTS,trimStyles:{...DEFAULTS.trimStyles}};normalizeState();renderHomeCases();renderDims();renderCurveOptions();renderStartOptions();renderTrimList();renderNotchOptions();renderNotchDims();bindEvents();syncUI({writeInputs:true});renderRoute();flushPending();document.addEventListener("touchmove",(event)=>{if(currentRoute()!=="customize")return;const target=event.target;if(!(target instanceof Element))return;if(target.closest(".custom-panels, .sheet"))return;if(event.cancelable)event.preventDefault();},{passive:false});document.addEventListener("visibilitychange",()=>{if(document.hidden)stopCaseAuto();else if(currentRoute()==="home")restartCaseAuto();});}
 init();

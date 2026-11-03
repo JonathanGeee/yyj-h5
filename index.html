@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#f6f0e6" />
     <meta name="format-detection" content="telephone=no" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.tcloudbase.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <title>栗子的家·定制装饰罩</title>
     <meta name="description" content="输入尺寸，即可完成定制" />
     <meta property="og:type" content="website" />
@@ -16,7 +21,7 @@
     <meta property="og:url" content="https://jonathangeee.github.io/yyj-h5/" />
     <link rel="image_src" href="https://jonathangeee.github.io/yyj-h5/assets/share-cover.jpg" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=8314f6adf7" />
     <script type="importmap">
       {
         "imports": {
@@ -29,8 +34,6 @@
   <body>
     <div class="app" id="app">
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-      <!-- ============ 首页 ============ -->
       <section class="view" data-view="home">
         <img class="share-preview" src="assets/share-cover.jpg" alt="" aria-hidden="true" />
         <main class="home-v2">
@@ -50,7 +53,6 @@
           <div class="case-progress" id="caseProgress" aria-label="案例切换"></div>
           <button class="home-buy" id="homeStart" type="button">定制同款</button>
           <button class="home-orders" id="homeOrders" type="button">查询订单</button>
-
           <section class="home-intro">
             <h1>输入尺寸，即可完成定制</h1>
             <div class="advantage-list">
@@ -61,8 +63,6 @@
           </section>
         </main>
       </section>
-
-      <!-- ============ 订单查询 ============ -->
       <section class="view view--orders" data-view="orders">
         <header class="appbar">
           <button class="icon-btn" data-back type="button" aria-label="返回">
@@ -71,7 +71,6 @@
           <div class="appbar-title">订单查询</div>
           <span class="appbar-spacer" aria-hidden="true"></span>
         </header>
-
         <main class="orders-page">
           <div class="orders-body">
             <form class="orders-search" id="orderSearchForm" novalidate>
@@ -86,17 +85,13 @@
               />
               <button class="orders-search-btn" type="submit">查询</button>
             </form>
-
             <div class="orders-results" id="orderResults" aria-live="polite"></div>
           </div>
-
           <div class="orders-bottom">
             <button class="orders-contact" id="ordersBottomContact" type="button">联系客服</button>
           </div>
         </main>
       </section>
-
-      <!-- ============ 订单详情 ============ -->
       <section class="view" data-view="order">
         <header class="appbar">
           <button class="icon-btn" data-back type="button" aria-label="返回">
@@ -113,8 +108,6 @@
           </div>
         </div>
       </section>
-
-      <!-- ============ 定制页 ============ -->
       <section class="view view--customize" data-view="customize">
         <div class="stage" id="stage">
           <div id="preview3d" class="stage-canvas"></div>
@@ -127,7 +120,6 @@
             <button class="stage-reset" id="previewReset" data-action="clear" type="button">重置</button>
           </header>
         </div>
-
         <div class="custom-sheet" id="customSheet">
           <nav class="custom-tabs" id="customizeTabs" role="tablist" aria-label="定制分类">
             <button role="tab" aria-selected="true" aria-controls="upperPanel" data-tab="upper" type="button">上层尺寸</button>
@@ -170,9 +162,6 @@
           </div>
         </div>
       </section>
-
-
-      <!-- ============ 安装说明 ============ -->
       <section class="view view--install" data-view="install">
         <div class="install-bg" id="installStage" aria-label="安装步骤三维演示"></div>
         <header class="appbar">
@@ -184,14 +173,12 @@
             <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.6"/><path d="M9.7 9.3a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.1.9-1.1 1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.8" r=".9" fill="currentColor"/></svg>
           </button>
         </header>
-
         <nav class="install-tabs" id="installTabs" role="tablist" aria-label="安装步骤">
           <button role="tab" aria-selected="true" data-key="base" type="button"><span>①</span>主体拼接</button>
           <button role="tab" aria-selected="false" data-key="curve" type="button"><span>②</span>曲面装饰</button>
           <button role="tab" aria-selected="false" data-key="trim" type="button"><span>③</span>装饰条</button>
           <button role="tab" aria-selected="false" data-key="paint" type="button"><span>④</span>刷漆</button>
         </nav>
-
         <div class="install-copy" id="installCopy" aria-live="polite">
           <div class="install-copy-text">
             <h2 id="installTitle">主体按顺序拼装</h2>
@@ -201,17 +188,13 @@
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 9a6 6 0 1 1 1.4 5.4M4 4v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
-
         <div class="buybar">
           <div class="buybar-price"><small>到手价</small><b id="installPrice">¥850</b></div>
           <button class="btn btn-ghost btn-compact" id="installBack" type="button">再改改</button>
           <button class="btn btn-primary btn-buy" id="installNext" type="button">去下单 · <span id="installPriceBtn">¥850</span></button>
         </div>
       </section>
-
     </div>
-
-      <!-- ============ 半屏弹层 ============ -->
       <div id="sheetRoot" class="sheet-root" hidden>
         <div class="sheet-backdrop" data-sheet-close></div>
         <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
@@ -224,7 +207,6 @@
           <div id="sheetActions" class="sheet-actions"></div>
         </div>
       </div>
-
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=f596210493"></script>
   </body>
 </html>
