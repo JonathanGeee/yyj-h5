@@ -322,15 +322,12 @@ function trimArtMarkup(id) {
   }
   if (id === "corner") {
     return `
-      <rect x="8" y="5" width="48" height="10" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
-      <rect x="8" y="5" width="10" height="38" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
       <path d="M18 15H52V19.5C40 21 24 28 18 39Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
       <path d="M21 17H48" stroke="#ffffff" stroke-width="1" opacity=".55"/>
       <path d="M48 19.5V23.5" stroke="#b89d7a" stroke-width=".8" opacity=".55"/>
     `;
   }
   return `
-    <rect x="5" y="30" width="54" height="10" rx="1.5" fill="#f5ecde" stroke="#c9b79d" stroke-width="1.2"/>
     <path d="M20 30A12 12 0 0 1 44 30Z" fill="#d8be9e" stroke="#a98a63" stroke-width="1.3" stroke-linejoin="round"/>
     <path d="M23 27A9 9 0 0 1 33 20" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity=".55"/>
     <path d="M18 30H46" stroke="#b89d7a" stroke-width=".9" opacity=".7"/>
@@ -393,6 +390,7 @@ let installApi = null;
 let installLoading = false;
 let installSig = "";
 let sheetOpen = false;
+let sheetPageScroll = 0;
 let lastFocused = null;
 let sheetCleanup = null;
 let miniInstallApi = null;
@@ -2984,6 +2982,18 @@ function setupQr() {
 }
 
 /* ---------- 弹层 / Toast ---------- */
+function lockSheetPageScroll() {
+  sheetPageScroll = window.scrollY || window.pageYOffset || 0;
+  document.body.style.top = `-${sheetPageScroll}px`;
+  document.body.classList.add("sheet-open");
+}
+
+function unlockSheetPageScroll() {
+  document.body.classList.remove("sheet-open");
+  document.body.style.top = "";
+  window.scrollTo(0, sheetPageScroll);
+}
+
 function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose = null, sheetClass = "" }) {
   if (sheetOpen) sheetCleanup?.();
   sheetCleanup = onClose;
@@ -3007,7 +3017,7 @@ function openSheet({ title, body = "", actions = [], backdrop = "dark", onClose 
   });
   $("#sheetRoot").classList.toggle("is-light", backdrop === "light");
   $("#sheetRoot").hidden = false;
-  document.body.classList.add("sheet-open");
+  if (!sheetOpen) lockSheetPageScroll();
   sheetOpen = true;
   window.setTimeout(() => $(".sheet-close")?.focus(), 60);
 }
@@ -3021,7 +3031,7 @@ function closeSheet() {
   $(".sheet")?.classList.remove("sheet--install", "sheet--order", "sheet--drawing");
   $("#sheetRoot").hidden = true;
   $("#sheetRoot").classList.remove("is-light");
-  document.body.classList.remove("sheet-open");
+  unlockSheetPageScroll();
   if (lastFocused?.focus) lastFocused.focus();
 }
 
@@ -3033,7 +3043,12 @@ function disposeMiniInstall() {
 
 function openInstallGuide(config = state) {
   disposeMiniInstall();
-  const steps = installStepsFor(config);
+  const installConfig = {
+    ...DEFAULTS,
+    ...config,
+    trimStyles: { ...(config.trimStyles || DEFAULTS.trimStyles) },
+  };
+  const steps = installStepsFor(installConfig);
   if (!steps.length) return;
   let replayCurrent = () => {};
 
@@ -3089,11 +3104,7 @@ function openInstallGuide(config = state) {
     .then(({ createInstallScene }) => {
       if (token !== miniInstallToken || !sheetOpen || !stage) return;
       try {
-        miniInstallApi = createInstallScene(
-          stage,
-          { ...config, trimStyles: { ...(config.trimStyles || {}) } },
-          { compact: true }
-        );
+        miniInstallApi = createInstallScene(stage, installConfig, { compact: true });
         miniInstallApi.setStep(currentKey, { animate: true });
       } catch (error) {
         console.warn("半屏安装演示初始化失败", error);
