@@ -828,11 +828,6 @@ function casePreviewState(index) {
 async function ensureCaseThumb() {
   if (caseThumbApi || caseThumbLoading || caseThumbFailed) return;
   if (currentRoute() !== "home") return;
-  const connection = navigator.connection;
-  if (connection && (connection.saveData || /(^|-)(2g|3g)$/.test(connection.effectiveType || ""))) {
-    caseThumbFailed = true;
-    return;
-  }
   const container = $("#case3dCanvas");
   if (!container) return;
   caseThumbLoading = true;
