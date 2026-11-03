@@ -2417,6 +2417,7 @@ function renderOrderDetail() {
       </div>
       ${rows.map(([label, value]) => `<div class="order-detail-row"><span>${esc(label)}</span><b>${esc(value)}</b></div>`).join("")}
       <div class="order-detail-total"><span>合计</span><b>${fmt(order.price?.total ?? 0)}</b></div>
+      <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
     </section>
     <section class="order-detail-service">
       <p class="order-detail-service-title">有问题？加客服微信</p>
@@ -2665,6 +2666,7 @@ function orderCheckoutHtml() {
         </div>
       </div>
 
+      <p class="order-return-note">定制产品一旦发出，无质量问题无法退货哦。</p>
       <p class="form-error" id="formError" role="alert"></p>
     </form>`;
 }
@@ -2900,6 +2902,7 @@ async function finishPaymentStep() {
   flow.maxStep = 2;
   flow.busy = false;
   setOrderStep(2);
+  toast("订单已提交，请添加客服微信");
 }
 
 function finishAddStep() {
@@ -3133,17 +3136,17 @@ function openHelp(kind) {
         <rect x="56" y="26" width="208" height="7" rx="2" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.3"/>
         <rect x="56" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
         <rect x="257" y="33" width="7" height="71" fill="#f4e8d8" stroke="#c9b79d" stroke-width="1.1"/>
-        <rect x="70" y="33" width="24" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
-        <rect x="226" y="33" width="24" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
         <rect x="63" y="70" width="194" height="34" rx="3" fill="#e7e3db" stroke="#b7b1a6" stroke-width="1.2"/>
+        <rect x="63" y="33" width="18" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
+        <rect x="239" y="33" width="18" height="37" rx="2" fill="#d8be9e" stroke="#b89d7a" stroke-width="1.2"/>
         <text x="160" y="21" text-anchor="middle" font-size="8" fill="#7a6248">定制罩</text>
-        <text x="82" y="55" text-anchor="middle" font-size="8" fill="#6b4f2f">垫高</text>
-        <text x="238" y="55" text-anchor="middle" font-size="8" fill="#6b4f2f">垫高</text>
+        <text x="72" y="55" text-anchor="middle" font-size="7" fill="#6b4f2f">垫高</text>
+        <text x="248" y="55" text-anchor="middle" font-size="7" fill="#6b4f2f">垫高</text>
         <text x="160" y="90" text-anchor="middle" font-size="9" fill="#777a72">油烟机</text>
         <path d="M286 64V40" stroke="#245c45" stroke-width="1.3" stroke-linecap="round"/>
         <path d="M280 46l6-8 6 8" fill="none" stroke="#245c45" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
         <text x="298" y="56" font-size="8" fill="#245c45">抬高</text>
-      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。垫板分左右两块装在罩体内部。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
+      </svg>`)}<p>油烟机位置偏低时，加垫高把装饰罩整体抬高，和吊柜、墙面齐平。垫板分左右两块装在罩体内部，贴着油烟机外罩两侧安装。</p><p class="sheet-note">5mm 一档，最高 60mm。</p>`,
     },
     install: {
       title: "安装小贴士",
