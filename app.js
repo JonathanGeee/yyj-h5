@@ -204,7 +204,7 @@ const k={basePrice:480,trimPrices:{none:0,single:35,corner:45},wechatId:"Jonatha
       </div>
     </div>`}function nr(){const t=k.serviceQrImage||k.qrImage||"";return`
     <div class="order-step-service">
-      <p class="order-step-kicker">\u957F\u6309\u6DFB\u52A0\u5BA2\u670D\u8BBE\u8BA1\u5E08\u{1F3A8}\u5E76\u53D1\u9001\u624B\u673A\u53F7</p>
+      <p class="order-step-kicker">\u957F\u6309\u6DFB\u52A0\u5BA2\u670D\u8BBE\u8BA1\u5E08\u{1F3A8}\uFF0C\u5E76\u53D1\u9001\u624B\u673A\u53F7</p>
       <div class="service-qr order-step-qr">
         ${t?`<img id="orderServiceQr" src="${x(t)}" alt="\u5BA2\u670D\u5FAE\u4FE1\u4E8C\u7EF4\u7801" />`:""}
         <p class="order-step-empty" id="orderServiceQrFallback" ${t?"hidden":""}>\u5BA2\u670D\u4E8C\u7EF4\u7801\u5F85\u914D\u7F6E</p>
