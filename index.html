@@ -21,8 +21,16 @@
     <meta property="og:url" content="https://jonathangeee.github.io/yyj-h5/" />
     <link rel="image_src" href="https://jonathangeee.github.io/yyj-h5/assets/share-cover.jpg" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-    <link rel="preload" as="image" href="assets/styles/cloud.jpg" fetchpriority="high" />
-    <link rel="stylesheet" href="styles.css?v=ec84df80cd" />
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="assets/styles/cloud-960.webp"
+      imagesrcset="assets/styles/cloud-480.webp 480w, assets/styles/cloud-960.webp 960w"
+      imagesizes="(max-width: 480px) 100vw, 480px"
+      fetchpriority="high"
+    />
+    <link rel="stylesheet" href="styles.css?v=f7ecfebc5d" />
     <script type="importmap">
       {
         "imports": {
@@ -36,10 +44,21 @@
     <div class="app" id="app">
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
       <section class="view" data-view="home">
-        <img class="share-preview" src="assets/share-cover.jpg" alt="" aria-hidden="true" />
         <main class="home-v2">
           <section class="home-hero" aria-label="定制案例">
-            <div class="case-track" id="caseTrack" aria-label="左右滑动查看案例"></div>
+            <div class="case-track" id="caseTrack" aria-label="左右滑动查看案例">
+              <article class="case-slide" data-index="0">
+                <picture class="case-picture">
+                  <source type="image/webp" srcset="assets/styles/cloud-480.webp 480w, assets/styles/cloud-960.webp 960w" sizes="(max-width: 480px) 100vw, 480px" />
+                  <img class="case-image is-cover" src="assets/styles/cloud.jpg" alt="云朵弧烟机罩案例" draggable="false" loading="eager" fetchpriority="high" decoding="async" data-fallback="assets/styles/cloud.jpg" />
+                </picture>
+                <div class="case-shade"></div>
+                <div class="case-meta">
+                  <h2 class="case-name">云朵弧</h2>
+                  <p class="case-spec">钟形弧线 · 宽底收边 · 暖米色</p>
+                </div>
+              </article>
+            </div>
             <button class="case-3d" id="case3d" type="button" aria-label="查看 3D 模型">
               <span class="case-3d-viewport" aria-hidden="true">
                 <span class="case-3d-flipper">
@@ -51,7 +70,14 @@
               <span class="case-3d-label">3D 模型</span>
             </button>
           </section>
-          <div class="case-progress" id="caseProgress" aria-label="案例切换"></div>
+          <div class="case-progress" id="caseProgress" aria-label="案例切换">
+            <button type="button" data-case-index="0" aria-label="查看案例 1" class="is-active"><span class="case-fill"></span></button>
+            <button type="button" data-case-index="1" aria-label="查看案例 2"><span class="case-fill"></span></button>
+            <button type="button" data-case-index="2" aria-label="查看案例 3"><span class="case-fill"></span></button>
+            <button type="button" data-case-index="3" aria-label="查看案例 4"><span class="case-fill"></span></button>
+            <button type="button" data-case-index="4" aria-label="查看案例 5"><span class="case-fill"></span></button>
+            <button type="button" data-case-index="5" aria-label="查看案例 6"><span class="case-fill"></span></button>
+          </div>
           <button class="home-buy" id="homeStart" type="button">定制同款</button>
           <button class="home-orders" id="homeOrders" type="button">查询订单</button>
           <section class="home-intro">
@@ -208,6 +234,6 @@
           <div id="sheetActions" class="sheet-actions"></div>
         </div>
       </div>
-    <script type="module" src="app.js?v=85e268db8a"></script>
+    <script type="module" src="app.js?v=a7863fc2d8"></script>
   </body>
 </html>
