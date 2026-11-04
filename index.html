@@ -30,7 +30,7 @@
       imagesizes="(max-width: 480px) 100vw, 480px"
       fetchpriority="high"
     />
-    <link rel="stylesheet" href="styles.css?v=04b76ff3c9" />
+    <link rel="stylesheet" href="styles.css?v=72006bf38e" />
     <script type="importmap">
       {
         "imports": {
@@ -139,10 +139,13 @@
         <div class="stage" id="stage">
           <div id="preview3d" class="stage-canvas"></div>
           <div id="previewFallback" class="stage-fallback" aria-hidden="true"></div>
-          <div class="stage-actions">
-            <button class="stage-pill" data-back type="button" aria-label="返回">返回</button>
-            <button class="stage-pill" id="previewReset" data-action="clear" type="button">重置</button>
-          </div>
+          <header class="stage-bar">
+            <button class="icon-btn" data-back type="button" aria-label="返回">
+              <svg viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="stage-title">定制装饰罩</div>
+            <button class="stage-reset" id="previewReset" data-action="clear" type="button">重置</button>
+          </header>
         </div>
         <div class="custom-sheet" id="customSheet">
           <nav class="custom-tabs" id="customizeTabs" role="tablist" aria-label="定制分类">
